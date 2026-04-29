@@ -224,10 +224,12 @@ class Pelican extends Server
         } catch (Exception $e) {}
 
         return [
-            ['name' => 'node_tag', 'label' => 'Node Tag',      'type' => 'text',   'required' => true,  'description' => empty($tagParts) ? 'No tagged nodes found.' : 'Available: ' . implode(', ', $tagParts)],
-            ['name' => 'eggs',     'label' => 'Available Eggs','type' => 'select', 'required' => true,  'options' => $eggList, 'multiple' => true, 'database_type' => 'array', 'description' => 'Eggs the customer can choose from at checkout. Per-egg env vars are hardcoded (egg 4 = N8N_HOST/N8N_PORT, egg 5 = EXTERNAL_IP/OPENCLAW_GATEWAY_PORT).'],
-            ['name' => 'start_on_completion', 'label' => 'Auto-start after install', 'type' => 'checkbox', 'description' => 'Start the server automatically once installation finishes.'],
-            ['name' => 'skip_scripts',        'label' => 'Skip Install Script',      'type' => 'checkbox', 'description' => 'Check to skip the egg install script. Leave unchecked to run it.'],
+            ['name' => 'node_tag',          'label' => 'Node Tag',                   'type' => 'text',     'required' => true,  'description' => empty($tagParts) ? 'No tagged nodes found.' : 'Available: ' . implode(', ', $tagParts)],
+            ['name' => 'eggs',              'label' => 'Available Eggs',             'type' => 'select',   'required' => true,  'options' => $eggList, 'multiple' => true, 'database_type' => 'array', 'description' => 'Eggs the customer can choose from at checkout.'],
+            ['name' => 'start_on_completion','label' => 'Auto-start after install',  'type' => 'checkbox', 'description' => 'Start the server automatically once installation finishes.'],
+            ['name' => 'skip_scripts',      'label' => 'Skip Install Script',        'type' => 'checkbox', 'description' => 'Check to skip the egg install script. Leave unchecked to run it.'],
+            ['name' => 'show_console',      'label' => 'Enable Console Tab',         'type' => 'checkbox', 'description' => 'Show the Console tab (power management) in the customer management view.'],
+            ['name' => 'show_reinstall',    'label' => 'Enable Reinstall Button',    'type' => 'checkbox', 'description' => 'Show the Reinstall button inside the Console tab.'],
         ];
     }
 
@@ -296,8 +298,8 @@ class Pelican extends Server
                 'N8N_PORT' => $port,
             ],
             5 => [
-                'EXTERNAL_IP'            => $ip,
-                'OPENCLAW_GATEWAY_PORT'  => $port,
+                'EXTERNAL_IP'           => $ip,
+                'OPENCLAW_GATEWAY_PORT' => $port,
             ],
             default => [],
         };
@@ -418,6 +420,35 @@ class Pelican extends Server
             }
             return false;
         }
+    }
+
+    // =========================================================================
+    // Public API for management views
+    // =========================================================================
+
+    public function getServer(int $serviceId, int $eggId, bool $failIfNotFound = false): array|false
+    {
+        return $this->getPanelServer($serviceId, $eggId, $failIfNotFound);
+    }
+
+    public function getEggName(int $eggId): string
+    {
+        return $this->eggName($eggId);
+    }
+
+    public function getServerResources(string $uuid): array
+    {
+        return $this->clientRequest('/api/client/servers/' . $uuid . '/resources')['attributes'] ?? [];
+    }
+
+    public function powerServer(string $uuid, string $signal): void
+    {
+        $this->clientRequest('/api/client/servers/' . $uuid . '/power', 'post', ['signal' => $signal]);
+    }
+
+    public function reinstallPanelServer(int $serverId): void
+    {
+        $this->request('/api/application/servers/' . $serverId . '/reinstall', 'post');
     }
 
     // =========================================================================
@@ -582,9 +613,8 @@ class Pelican extends Server
 
     public function getActions(Service $service, $settings, $properties): array
     {
-        $eggIds       = $this->selectedEggIds($settings, $properties);
-        $hasClientKey = ! empty($this->config('client_api_key'));
-        $actions      = [];
+        $eggIds  = $this->selectedEggIds($settings, $properties);
+        $actions = [];
 
         foreach ($eggIds as $index => $eggId) {
             if ($index >= 8) break;
@@ -592,73 +622,24 @@ class Pelican extends Server
             $server = $this->getPanelServer($service->id, $eggId, false);
             if ($server === false) continue;
 
-            $name     = $this->eggName($eggId);
-            $panelUrl = rtrim($this->config('host'), '/') . '/server/' . $server['identifier'];
-
             $cachedDomain = Cache::get('pelican_domain_' . $service->id . '_' . $eggId);
             if ($cachedDomain) {
-                $openUrl = 'https://' . $cachedDomain;
-            } else {
-                $cached  = Cache::get('pelican_alloc_' . $service->id . '_' . $eggId);
-                $openUrl = $cached ? 'http://' . $cached['ip'] . ':' . $cached['port'] : $panelUrl;
+                $actions[] = [
+                    'type'  => 'button',
+                    'label' => 'Open ' . $this->eggName($eggId),
+                    'url'   => 'https://' . $cachedDomain,
+                ];
             }
+        }
 
-            $actions[] = ['type' => 'button', 'label' => 'Open '  . $name, 'url' => $openUrl];
-            $actions[] = ['type' => 'button', 'label' => 'Panel ' . $name, 'url' => $panelUrl];
-
-            if ($hasClientKey) {
-                $i = $index;
-                $actions[] = ['type' => 'button', 'label' => 'Start '     . $name, 'function' => 'startEgg'     . $i];
-                $actions[] = ['type' => 'button', 'label' => 'Restart '   . $name, 'function' => 'restartEgg'   . $i];
-                $actions[] = ['type' => 'button', 'label' => 'Reinstall ' . $name, 'function' => 'reinstallEgg' . $i];
-            }
+        if (! empty($eggIds)) {
+            $actions[] = [
+                'type'  => 'button',
+                'label' => 'Manage',
+                'url'   => route('pelican.overview', ['service' => $service->id]),
+            ];
         }
 
         return $actions;
     }
-
-    // =========================================================================
-    // Power / reinstall
-    // =========================================================================
-
-    private function eggPower(Service $service, array $settings, $properties, int $index, string $signal): void
-    {
-        $eggIds = $this->selectedEggIds($settings, $properties);
-        if (! isset($eggIds[$index])) throw new Exception('Egg index ' . $index . ' not configured.');
-        $server = $this->getPanelServer($service->id, $eggIds[$index]);
-        $this->clientRequest('/api/client/servers/' . $server['uuid'] . '/power', 'post', ['signal' => $signal]);
-    }
-
-    private function eggReinstall(Service $service, array $settings, $properties, int $index): void
-    {
-        $eggIds = $this->selectedEggIds($settings, $properties);
-        if (! isset($eggIds[$index])) throw new Exception('Egg index ' . $index . ' not configured.');
-        $server = $this->getPanelServer($service->id, $eggIds[$index]);
-        $this->request('/api/application/servers/' . $server['id'] . '/reinstall', 'post');
-    }
-
-    public function startEgg0(Service $s, $set, $p): void     { $this->eggPower($s, $set, $p, 0, 'start');   }
-    public function restartEgg0(Service $s, $set, $p): void   { $this->eggPower($s, $set, $p, 0, 'restart'); }
-    public function reinstallEgg0(Service $s, $set, $p): void { $this->eggReinstall($s, $set, $p, 0); }
-    public function startEgg1(Service $s, $set, $p): void     { $this->eggPower($s, $set, $p, 1, 'start');   }
-    public function restartEgg1(Service $s, $set, $p): void   { $this->eggPower($s, $set, $p, 1, 'restart'); }
-    public function reinstallEgg1(Service $s, $set, $p): void { $this->eggReinstall($s, $set, $p, 1); }
-    public function startEgg2(Service $s, $set, $p): void     { $this->eggPower($s, $set, $p, 2, 'start');   }
-    public function restartEgg2(Service $s, $set, $p): void   { $this->eggPower($s, $set, $p, 2, 'restart'); }
-    public function reinstallEgg2(Service $s, $set, $p): void { $this->eggReinstall($s, $set, $p, 2); }
-    public function startEgg3(Service $s, $set, $p): void     { $this->eggPower($s, $set, $p, 3, 'start');   }
-    public function restartEgg3(Service $s, $set, $p): void   { $this->eggPower($s, $set, $p, 3, 'restart'); }
-    public function reinstallEgg3(Service $s, $set, $p): void { $this->eggReinstall($s, $set, $p, 3); }
-    public function startEgg4(Service $s, $set, $p): void     { $this->eggPower($s, $set, $p, 4, 'start');   }
-    public function restartEgg4(Service $s, $set, $p): void   { $this->eggPower($s, $set, $p, 4, 'restart'); }
-    public function reinstallEgg4(Service $s, $set, $p): void { $this->eggReinstall($s, $set, $p, 4); }
-    public function startEgg5(Service $s, $set, $p): void     { $this->eggPower($s, $set, $p, 5, 'start');   }
-    public function restartEgg5(Service $s, $set, $p): void   { $this->eggPower($s, $set, $p, 5, 'restart'); }
-    public function reinstallEgg5(Service $s, $set, $p): void { $this->eggReinstall($s, $set, $p, 5); }
-    public function startEgg6(Service $s, $set, $p): void     { $this->eggPower($s, $set, $p, 6, 'start');   }
-    public function restartEgg6(Service $s, $set, $p): void   { $this->eggPower($s, $set, $p, 6, 'restart'); }
-    public function reinstallEgg6(Service $s, $set, $p): void { $this->eggReinstall($s, $set, $p, 6); }
-    public function startEgg7(Service $s, $set, $p): void     { $this->eggPower($s, $set, $p, 7, 'start');   }
-    public function restartEgg7(Service $s, $set, $p): void   { $this->eggPower($s, $set, $p, 7, 'restart'); }
-    public function reinstallEgg7(Service $s, $set, $p): void { $this->eggReinstall($s, $set, $p, 7); }
 }
