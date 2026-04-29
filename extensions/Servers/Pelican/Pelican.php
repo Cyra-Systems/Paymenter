@@ -8,10 +8,22 @@ use App\Models\Service;
 use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
+use Paymenter\Extensions\Servers\Pelican\Livewire\Console;
+use Paymenter\Extensions\Servers\Pelican\Livewire\Overview;
 
 class Pelican extends Server
 {
+    public function boot(): void
+    {
+        include __DIR__ . '/routes.php';
+        View::addNamespace('pelican', __DIR__ . '/views');
+        Livewire::component('pelican.overview', Overview::class);
+        Livewire::component('pelican.console', Console::class);
+    }
+
     public function getConfig($values = []): array
     {
         return [
@@ -163,7 +175,6 @@ class Pelican extends Server
             throw new Exception('NPM returned no proxy ID for ' . $domain);
         }
 
-        // Request LE cert + force-SSL + HTTP/2. Best-effort: may fail before DNS propagates.
         try {
             $this->npmRequest('/api/nginx/proxy-hosts/' . $proxyId, 'put', [
                 'domain_names'            => [$domain],
@@ -277,16 +288,14 @@ class Pelican extends Server
         return [];
     }
 
-    // Hardcoded per-egg environment-variable injection.
-    // Each egg has its own isolated install section: 2 lines for IP and port.
     private function eggEnvironment(int $eggId, string $ip, string $port): array
     {
         return match ($eggId) {
-            4 => [ // N8N
+            4 => [
                 'N8N_HOST' => $ip,
                 'N8N_PORT' => $port,
             ],
-            5 => [ // Clawbot / OpenClaw
+            5 => [
                 'EXTERNAL_IP'            => $ip,
                 'OPENCLAW_GATEWAY_PORT'  => $port,
             ],
@@ -294,15 +303,6 @@ class Pelican extends Server
         };
     }
 
-    // Pelican's API requires every egg variable to be present in the
-    // `environment` payload — it stores null for any missing key (the
-    // VariableValidatorService only uses default_value for *validation*,
-    // not persistence). So we must explicitly send every var.
-    //
-    // Three sources tried in order (first non-empty wins):
-    //   1. attributes.relationships.variables.data   (Pterodactyl/Fractal-nested shape)
-    //   2. relationships.variables.data              (Fractal top-level shape)
-    //   3. /api/application/eggs/{id}/export         (egg export JSON; always has flat `variables` array)
     private function fetchEggDefaults(int $eggId, array $eggData): array
     {
         $variables = $eggData['attributes']['relationships']['variables']['data']
@@ -456,21 +456,15 @@ class Pelican extends Server
                     continue;
                 }
 
-                // Get allocation — same source used for NPM
                 $allocation = $this->findAvailableAllocation($node['id']);
                 $ip   = (! empty($allocation['ip_alias'])) ? $allocation['ip_alias'] : $allocation['ip'];
                 $port = (string) $allocation['port'];
 
-                // Pull egg with its variables. Pelican's API persists null for
-                // any variable missing from the `environment` payload, so we
-                // must seed every default from the egg definition.
                 $eggData = $this->request('/api/application/eggs/' . $eggId, 'get', ['include' => 'variables']);
                 if (! isset($eggData['attributes'])) {
                     throw new Exception('Could not fetch egg data for egg ' . $eggId);
                 }
 
-                // Seed every egg variable with its default_value, then merge our
-                // hardcoded per-egg IP/port overrides on top (dispatched by Egg ID).
                 $environment = array_merge(
                     $this->fetchEggDefaults((int) $eggId, $eggData),
                     $this->eggEnvironment((int) $eggId, $ip, $port)
@@ -643,7 +637,6 @@ class Pelican extends Server
         $this->request('/api/application/servers/' . $server['id'] . '/reinstall', 'post');
     }
 
-    // Explicit stubs required by Paymenter's method_exists() dispatcher (indices 0-7)
     public function startEgg0(Service $s, $set, $p): void     { $this->eggPower($s, $set, $p, 0, 'start');   }
     public function restartEgg0(Service $s, $set, $p): void   { $this->eggPower($s, $set, $p, 0, 'restart'); }
     public function reinstallEgg0(Service $s, $set, $p): void { $this->eggReinstall($s, $set, $p, 0); }
