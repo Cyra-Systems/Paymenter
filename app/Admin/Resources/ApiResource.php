@@ -48,6 +48,13 @@ class ApiResource extends Resource
                     ->default(true)
                     ->visibleOn('edit')
                     ->label('Active Status'),
+                TextInput::make('rate_limit')
+                    ->label('Rate Limit (requests/min)')
+                    ->hint('Applies to User API keys. Leave blank for no limit.')
+                    ->integer()
+                    ->minValue(1)
+                    ->maxValue(10000)
+                    ->nullable(),
 
                 CheckboxList::make('permissions')
                     ->options(array_merge(Arr::dot(config('permissions.api')), $extensionApiPermissions))
@@ -70,6 +77,11 @@ class ApiResource extends Resource
                     ->label('Allowed IP Addresses'),
                 IconColumn::make('enabled')
                     ->boolean(),
+                TextColumn::make('rate_limit')
+                    ->label('Rate Limit')
+                    ->formatStateUsing(fn ($state) => $state ? $state . ' req/min' : 'Unlimited')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('last_used_at')
                     ->dateTime()
                     ->label('Last Used At')
