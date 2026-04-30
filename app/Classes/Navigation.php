@@ -157,6 +157,18 @@ class Navigation
                                 'url' => route('account.notifications'),
                                 'priority' => 50,
                             ],
+                            [
+                                'name' => 'API Keys',
+                                'url' => route('account.api-keys'),
+                                'params' => [],
+                                'priority' => 60,
+                            ],
+                            [
+                                'name' => 'Webhooks',
+                                'url' => route('account.webhooks'),
+                                'params' => [],
+                                'priority' => 70,
+                            ],
                         ]
                     ),
                 ],
