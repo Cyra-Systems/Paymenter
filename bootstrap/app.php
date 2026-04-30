@@ -10,12 +10,10 @@ use App\Http\Middleware\ProxyMiddleware;
 use App\Http\Middleware\ResolveUserSession;
 use App\Http\Middleware\SetLocale;
 use App\Models\DebugLog;
-use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Passport\Http\Middleware\CheckForAnyScope;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -39,22 +37,6 @@ return Application::configure(basePath: dirname(__DIR__))
             ImpersonateMiddleware::class,
             SetLocale::class,
         ]);
-
-        RateLimiter::for('user-api', function (Request $request) {
-            $key = $request->attributes->get('api_key');
-            if (!$key || !$key->rate_limit) {
-                return Limit::none();
-            }
-
-            return Limit::perMinute($key->rate_limit)->by('user-api-key:' . $key->id)->response(function () {
-                return response()->json([
-                    'error' => [
-                        'code' => 'RATE_LIMIT_EXCEEDED',
-                        'message' => 'Too many requests. Please slow down.',
-                    ],
-                ], 429);
-            });
-        });
     })
     ->withEvents(discover: [
         __DIR__ . '/../app/Extensions',

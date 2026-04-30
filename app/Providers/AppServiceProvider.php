@@ -15,6 +15,7 @@ use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Exception;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
@@ -23,6 +24,7 @@ use Illuminate\Routing\UrlGenerator;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -126,7 +128,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Handler::class, function ($app) {
             return new ErrorHandler($app);
         });
-
     }
 
     /**
@@ -134,6 +135,28 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Per-key rate limiter for the user API (must be registered here, not in
+        // bootstrap/app.php, because facades are unavailable during composer's
+        // post-autoload-dump phase when withMiddleware() runs).
+        RateLimiter::for('user-api', function (Request $request) {
+            $key = $request->attributes->get('api_key');
+
+            if (!$key || !$key->rate_limit) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute($key->rate_limit)
+                ->by('user-api-key:' . $key->id)
+                ->response(function () {
+                    return response()->json([
+                        'error' => [
+                            'code'    => 'RATE_LIMIT_EXCEEDED',
+                            'message' => 'Too many requests. Please slow down.',
+                        ],
+                    ], 429);
+                });
+        });
+
         // Change livewire url
         Livewire::setUpdateRoute(function ($handle) {
             return Route::post('/paymenter/update', $handle)->middleware('web')->name('paymenter.');
@@ -161,7 +184,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Queue::after(function (JobProcessed $event) {
-            if ($event->job->resolveName() === 'App\Mail\Mail') {
+            if ($event->job->resolveName() === 'App\\Mail\\Mail') {
                 $payload = json_decode($event->job->getRawBody());
                 $data = unserialize($payload->data->command);
                 EmailLog::where('id', $data->mailable->email_log_id)->update([
@@ -171,7 +194,7 @@ class AppServiceProvider extends ServiceProvider
             }
         });
         Queue::failing(function (JobFailed $event) {
-            if ($event->job->resolveName() === 'App\Mail\Mail') {
+            if ($event->job->resolveName() === 'App\\Mail\\Mail') {
                 $payload = json_decode($event->job->getRawBody());
                 $data = unserialize($payload->data->command);
                 EmailLog::where('id', $data->mailable->email_log_id)->update([
