@@ -86,6 +86,9 @@ class ProductResource extends Resource
                                 Checkbox::make('hidden')
                                     ->label('Hide product')
                                     ->hint('Hide the product from the client area.'),
+                                Checkbox::make('user_api')
+                                    ->label('Accessible via User API')
+                                    ->hint('Allow this product to be browsed and ordered through the user-scoped REST API (reseller / headless integrations).'),
 
                                 RichEditor::make('description')->nullable()->columnSpanFull(),
                                 FileUpload::make('image')
