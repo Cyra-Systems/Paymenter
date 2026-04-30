@@ -181,6 +181,32 @@ class Settings
                 ],
             ],
 
+            'user-api' => [
+                [
+                    'name' => 'user_api_enabled',
+                    'label' => 'Enable User API',
+                    'type' => 'checkbox',
+                    'database_type' => 'boolean',
+                    'default' => true,
+                    'description' => 'Allow users to create API keys and access the /api/v1/user/* endpoints. Disable to shut down the entire user-facing REST API.',
+                ],
+                [
+                    'name' => 'user_api_default_rate_limit',
+                    'label' => 'Default Rate Limit (requests/min)',
+                    'type' => 'number',
+                    'required' => false,
+                    'description' => 'Global fallback rate limit applied to any user API key that has no per-key limit configured. Leave blank for unlimited.',
+                ],
+                [
+                    'name' => 'user_api_allow_key_creation',
+                    'label' => 'Allow Users to Create Their Own API Keys',
+                    'type' => 'checkbox',
+                    'database_type' => 'boolean',
+                    'default' => true,
+                    'description' => 'When disabled, only admins can create user-type API keys. Users will still be able to use keys created for them by an admin.',
+                ],
+            ],
+
             'social-login' => [
                 [
                     'name' => 'oauth_google',
