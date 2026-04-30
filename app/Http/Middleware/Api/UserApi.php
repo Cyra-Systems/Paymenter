@@ -17,6 +17,15 @@ class UserApi
      */
     public function handle(Request $request, Closure $next): Response
     {
+        if (!config('settings.user_api_enabled', true)) {
+            return response()->json([
+                'error' => [
+                    'code'    => 'SERVICE_UNAVAILABLE',
+                    'message' => 'The User API is currently disabled.',
+                ],
+            ], 503);
+        }
+
         if (!$request->bearerToken()) {
             return response()->json([
                 'error' => [
