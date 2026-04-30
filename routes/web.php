@@ -17,14 +17,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', Home::class)->name('home');
 
-// Destroy the session and log out the user.
-// auth()->logout();
 // Authorization routes
 Route::group(['middleware' => ['web', 'guest']], function () {
     Route::get('/login', Auth\Login::class)->name('login');
     Route::get('/2fa', Auth\Tfa::class)->name('2fa');
     Route::get('/register', Auth\Register::class)->name('register');
-    // Todo
     Route::get('/password/request', Auth\Password\Request::class)->name('password.request');
     Route::get('/password/reset/{token}', Auth\Password\Reset::class)->name('password.reset');
 
@@ -53,6 +50,8 @@ Route::group(['middleware' => ['web', 'auth']], function () {
     Route::get('/account/credits', Client\Credits::class)->name('account.credits');
     Route::get('/account/payment-methods', Client\PaymentMethods::class)->name('account.payment-methods');
     Route::get('/account/notifications', Client\Notifications::class)->name('account.notifications');
+    Route::get('/account/api-keys', Client\ApiKeys::class)->name('account.api-keys');
+    Route::get('/account/webhooks', Client\Webhooks::class)->name('account.webhooks');
 
     Route::get('/email/verify', Auth\VerifyEmail::class)->name('verification.notice');
     Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
@@ -66,10 +65,9 @@ Route::group(['middleware' => ['web', 'auth']], function () {
 Route::get('cart', Cart::class)->name('cart')->middleware('checkout');
 
 Route::group(['prefix' => 'products', 'middleware' => 'checkout'], function () {
-    Route::get('/{category:slug}', Products\Index::class)->name('category.show')/* ->where('category', '[A-Za-z0-9_/-]+') */;
-    Route::get('/{category:slug}/{product:slug}', Products\Show::class)->name('products.show')/* ->where('category', '[A-Za-z0-9_/-]+') */;
-    Route::get('/{category:slug}/{product:slug}/checkout', Products\Checkout::class)->name('products.checkout')/* ->where('category', '[A-Za-z0-9_/-]+') */;
-    // Allow for nested categories
+    Route::get('/{category:slug}', Products\Index::class)->name('category.show');
+    Route::get('/{category:slug}/{product:slug}', Products\Show::class)->name('products.show');
+    Route::get('/{category:slug}/{product:slug}/checkout', Products\Checkout::class)->name('products.checkout');
 });
 
 Route::group([
