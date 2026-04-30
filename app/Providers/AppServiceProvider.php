@@ -141,12 +141,15 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('user-api', function (Request $request) {
             $key = $request->attributes->get('api_key');
 
-            if (!$key || !$key->rate_limit) {
+            // Per-key limit takes priority; fall back to global default from settings.
+            $limit = $key?->rate_limit ?? ((int) config('settings.user_api_default_rate_limit') ?: null);
+
+            if (!$limit) {
                 return Limit::none();
             }
 
-            return Limit::perMinute($key->rate_limit)
-                ->by('user-api-key:' . $key->id)
+            return Limit::perMinute($limit)
+                ->by('user-api-key:' . ($key?->id ?? 'unknown'))
                 ->response(function () {
                     return response()->json([
                         'error' => [
