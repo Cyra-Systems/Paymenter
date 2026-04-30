@@ -253,5 +253,21 @@ return [
                 'view' => 'View Roles',
             ],
         ],
+        'user' => [
+            'catalog' => [
+                'view' => 'View product catalog (products & categories)',
+            ],
+            'services' => [
+                'view' => 'View own services',
+                'cancel' => 'Cancel own services',
+            ],
+            'orders' => [
+                'view' => 'View own orders',
+                'create' => 'Create orders (provision services)',
+            ],
+            'invoices' => [
+                'view' => 'View own invoices',
+            ],
+        ],
     ],
 ];
