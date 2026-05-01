@@ -17,22 +17,19 @@ class WebhookDispatchJob implements ShouldQueue
 
     public int $tries = 3;
 
-    public int $backoff = 60;
+    public array $backoff = [60, 120, 300];
 
     public function __construct(
-        public readonly int $userId,
+        public readonly int $webhookId,
         public readonly string $event,
         public readonly array $payload
     ) {}
 
     public function handle(): void
     {
-        $webhooks = Webhook::where('user_id', $this->userId)
-            ->where('enabled', true)
-            ->get()
-            ->filter(fn ($webhook) => in_array($this->event, $webhook->events ?? []));
+        $webhook = Webhook::find($this->webhookId);
 
-        if ($webhooks->isEmpty()) {
+        if (!$webhook || !$webhook->enabled) {
             return;
         }
 
@@ -42,25 +39,24 @@ class WebhookDispatchJob implements ShouldQueue
             'data'      => $this->payload,
         ], JSON_UNESCAPED_SLASHES);
 
-        foreach ($webhooks as $webhook) {
-            $signature = 'sha256=' . hash_hmac('sha256', $body, $webhook->secret);
+        $signature = 'sha256=' . hash_hmac('sha256', $body, $webhook->secret);
 
-            try {
-                Http::timeout(10)
-                    ->withHeaders([
-                        'Content-Type'        => 'application/json',
-                        'X-Webhook-Signature' => $signature,
-                        'X-Webhook-Event'     => $this->event,
-                    ])
-                    ->send('POST', $webhook->url, ['body' => $body]);
+        $response = Http::timeout(10)
+            ->withHeaders([
+                'Content-Type'        => 'application/json',
+                'X-Webhook-Signature' => $signature,
+                'X-Webhook-Event'     => $this->event,
+                'X-Webhook-Delivery'  => $this->job?->uuid() ?? (string) \Illuminate\Support\Str::uuid(),
+            ])
+            ->send('POST', $webhook->url, ['body' => $body]);
 
-                $webhook->last_called_at = now();
-                $webhook->save();
-            } catch (\Exception $e) {
-                Log::warning("Webhook delivery failed for webhook #{$webhook->id} ({$this->event}): " . $e->getMessage());
-                // Re-throw so the job queue retries
-                throw $e;
-            }
+        if (!$response->successful()) {
+            Log::warning("Webhook #{$webhook->id} ({$this->event}) returned HTTP {$response->status()}");
+            throw new \RuntimeException(
+                "Webhook #{$webhook->id} delivery failed: HTTP {$response->status()}"
+            );
         }
+
+        $webhook->updateQuietly(['last_called_at' => now()]);
     }
 }

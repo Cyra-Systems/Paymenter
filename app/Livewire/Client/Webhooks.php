@@ -19,16 +19,18 @@ class Webhooks extends Component
     public ?string $newSecret = null;
 
     public const AVAILABLE_EVENTS = [
-        'invoice.paid'   => 'Invoice Paid',
-        'service.active' => 'Service Activated',
-        'webhook.test'   => 'Webhook Test (ping)',
+        'invoice.created' => 'Invoice Created (payment required)',
+        'invoice.paid'    => 'Invoice Paid',
+        'order.created'   => 'Order Created',
+        'service.active'  => 'Service Activated',
+        'webhook.test'    => 'Webhook Test (ping)',
     ];
 
     public function rules(): array
     {
         return [
-            'url'            => 'required|url|max:500',
-            'selectedEvents' => 'required|array|min:1',
+            'url'              => 'required|url|max:500',
+            'selectedEvents'   => 'required|array|min:1',
             'selectedEvents.*' => 'string|in:' . implode(',', array_keys(self::AVAILABLE_EVENTS)),
         ];
     }
@@ -58,7 +60,6 @@ class Webhooks extends Component
 
         if (!$webhook) {
             $this->notify(__('Webhook not found.'), 'error');
-
             return;
         }
 
@@ -73,7 +74,6 @@ class Webhooks extends Component
 
         if (!$webhook) {
             $this->notify(__('Webhook not found.'), 'error');
-
             return;
         }
 
@@ -87,11 +87,11 @@ class Webhooks extends Component
 
         if (!$webhook) {
             $this->notify(__('Webhook not found.'), 'error');
-
             return;
         }
 
-        WebhookDispatchJob::dispatch(Auth::id(), 'webhook.test', [
+        // Dispatch directly to this webhook only (not fan-out to all user webhooks)
+        WebhookDispatchJob::dispatch($webhook->id, 'webhook.test', [
             'message' => 'This is a test webhook from Paymenter.',
         ]);
 
