@@ -11,12 +11,14 @@ class Webhook extends Model
         'events',
         'enabled',
         'last_called_at',
+        'last_response_status',
     ];
 
     protected $casts = [
-        'events' => 'array',
-        'enabled' => 'boolean',
-        'last_called_at' => 'datetime',
+        'events'               => 'array',
+        'enabled'              => 'boolean',
+        'last_called_at'       => 'datetime',
+        'last_response_status' => 'integer',
     ];
 
     public function user()

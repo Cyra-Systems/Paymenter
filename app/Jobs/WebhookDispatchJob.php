@@ -10,6 +10,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class WebhookDispatchJob implements ShouldQueue
 {
@@ -41,22 +42,34 @@ class WebhookDispatchJob implements ShouldQueue
 
         $signature = 'sha256=' . hash_hmac('sha256', $body, $webhook->secret);
 
-        $response = Http::timeout(10)
-            ->withHeaders([
-                'Content-Type'        => 'application/json',
-                'X-Webhook-Signature' => $signature,
-                'X-Webhook-Event'     => $this->event,
-                'X-Webhook-Delivery'  => $this->job?->uuid() ?? (string) \Illuminate\Support\Str::uuid(),
-            ])
-            ->send('POST', $webhook->url, ['body' => $body]);
+        try {
+            $response = Http::timeout(10)
+                ->withHeaders([
+                    'Content-Type'        => 'application/json',
+                    'X-Webhook-Signature' => $signature,
+                    'X-Webhook-Event'     => $this->event,
+                    'X-Webhook-Delivery'  => $this->job?->uuid() ?? (string) Str::uuid(),
+                ])
+                ->send('POST', $webhook->url, ['body' => $body]);
+        } catch (\Exception $e) {
+            // Network-level failure (timeout, DNS, TLS, etc.) — store 0 so the UI
+            // shows a red indicator and re-throw so the job queue retries.
+            $webhook->updateQuietly(['last_response_status' => 0]);
+            Log::warning("Webhook #{$webhook->id} ({$this->event}) network error: " . $e->getMessage());
+            throw $e;
+        }
 
         if (!$response->successful()) {
+            $webhook->updateQuietly(['last_response_status' => $response->status()]);
             Log::warning("Webhook #{$webhook->id} ({$this->event}) returned HTTP {$response->status()}");
             throw new \RuntimeException(
                 "Webhook #{$webhook->id} delivery failed: HTTP {$response->status()}"
             );
         }
 
-        $webhook->updateQuietly(['last_called_at' => now()]);
+        $webhook->updateQuietly([
+            'last_called_at'       => now(),
+            'last_response_status' => $response->status(),
+        ]);
     }
 }
