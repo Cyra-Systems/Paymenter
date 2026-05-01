@@ -59,7 +59,8 @@ Route::group(['middleware' => ['api.user', 'throttle:user-api'], 'prefix' => 'v1
     Route::get('orders', [UserOrderController::class, 'index']);
     Route::get('orders/{order}', [UserOrderController::class, 'show']);
 
-    // Invoices (read-only)
+    // Invoices
     Route::get('invoices', [UserInvoiceController::class, 'index']);
     Route::get('invoices/{invoice}', [UserInvoiceController::class, 'show']);
+    Route::post('invoices/{invoice}/pay', [UserInvoiceController::class, 'pay']);
 });

@@ -267,6 +267,7 @@ return [
             ],
             'invoices' => [
                 'view' => 'View own invoices',
+                'pay' => 'Pay invoices using account credits',
             ],
         ],
     ],
