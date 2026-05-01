@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\User;
 
 use App\Http\Resources\OrderResource;
 use App\Jobs\Server\CreateJob;
+use App\Models\ConfigOption;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Plan;
@@ -22,12 +23,14 @@ class OrderController extends UserApiController
     {
         $this->checkPermission('orders.view');
 
+        $perPage = min((int) $request->input('per_page', 15), 100);
+
         $orders = QueryBuilder::for(Order::class)
             ->where('user_id', $this->apiUser()->id)
             ->allowedFilters(['currency_code'])
             ->allowedIncludes($this->userAllowedIncludes(self::INCLUDES))
             ->allowedSorts(['id', 'created_at'])
-            ->simplePaginate(request('per_page', 15));
+            ->simplePaginate($perPage);
 
         return OrderResource::collection($orders);
     }
@@ -58,10 +61,9 @@ class OrderController extends UserApiController
             'items.*.plan_id'                        => 'required|integer|exists:plans,id',
             'items.*.quantity'                       => 'sometimes|integer|min:1|max:100',
             'items.*.config_options'                 => 'sometimes|array',
-            'items.*.config_options.*.option_id'     => 'required_with:items.*.config_options|integer',
-            'items.*.config_options.*.option_type'   => 'required_with:items.*.config_options|string',
+            'items.*.config_options.*.option_id'     => 'required_with:items.*.config_options|integer|exists:config_options,id',
             'items.*.config_options.*.value'         => 'nullable',
-            'items.*.checkout_config'                => 'sometimes|array',
+            'items.*.checkout_config'                => 'sometimes|array|max:50',
         ]);
 
         $currencyCode = $validated['currency_code'];
@@ -88,6 +90,7 @@ class OrderController extends UserApiController
                 $plan = Plan::where('id', $item['plan_id'])
                     ->where('priceable_type', Product::class)
                     ->where('priceable_id', $product->id)
+                    ->lockForUpdate()
                     ->first();
 
                 if (!$plan) {
@@ -114,6 +117,7 @@ class OrderController extends UserApiController
                     $existing = Service::where('user_id', $user->id)
                         ->where('product_id', $product->id)
                         ->whereNotIn('status', [Service::STATUS_CANCELLED])
+                        ->lockForUpdate()
                         ->count();
 
                     if ($existing + $quantity > $product->per_user_limit) {
@@ -126,17 +130,43 @@ class OrderController extends UserApiController
                     }
                 }
 
-                // Resolve unit price for the requested currency
+                // Validate checkout_config keys (S-03: prevent arbitrary property injection)
+                foreach ($item['checkout_config'] ?? [] as $key => $value) {
+                    if (!preg_match('/^[a-zA-Z0-9_]{1,64}$/', (string) $key)) {
+                        DB::rollBack();
+                        return $this->apiError(
+                            'VALIDATION_ERROR',
+                            "Invalid checkout_config key [{$key}]: keys must be alphanumeric with underscores, max 64 characters.",
+                            400
+                        );
+                    }
+                }
+
+                // Resolve unit price for the requested currency (lock the plan's prices)
                 $plan->load('prices');
                 $priceModel = $plan->prices->where('currency_code', $currencyCode)->first();
                 $unitPrice  = $priceModel ? (float) $priceModel->price : 0.0;
 
+                // Resolve config options server-side (S-04: never trust client-supplied key names)
+                $resolvedConfigOptions = [];
+                foreach ($item['config_options'] ?? [] as $configOptionInput) {
+                    $optionModel = ConfigOption::find($configOptionInput['option_id']);
+                    if (!$optionModel) {
+                        continue;
+                    }
+                    $resolvedConfigOptions[] = [
+                        'model' => $optionModel,
+                        'value' => $configOptionInput['value'] ?? null,
+                    ];
+                }
+
                 $resolvedItems[] = [
-                    'product'    => $product,
-                    'plan'       => $plan,
-                    'quantity'   => $quantity,
-                    'unit_price' => $unitPrice,
-                    'item'       => $item,
+                    'product'        => $product,
+                    'plan'           => $plan,
+                    'quantity'       => $quantity,
+                    'unit_price'     => $unitPrice,
+                    'checkout_config'=> $item['checkout_config'] ?? [],
+                    'config_options' => $resolvedConfigOptions,
                 ];
             }
 
@@ -183,33 +213,36 @@ class OrderController extends UserApiController
                     'status'        => Service::STATUS_PENDING,
                 ]);
 
-                // Persist freeform checkout config as service properties
-                foreach ($ri['item']['checkout_config'] ?? [] as $key => $value) {
-                    $service->properties()->updateOrCreate(['key' => $key], ['value' => $value]);
+                // Persist validated checkout config (S-03: keys already validated above)
+                foreach ($ri['checkout_config'] as $key => $value) {
+                    $safeValue = is_string($value) ? substr($value, 0, 1000) : $value;
+                    $service->properties()->updateOrCreate(['key' => $key], ['value' => $safeValue]);
                 }
 
-                // Persist typed config option selections
-                foreach ($ri['item']['config_options'] ?? [] as $configOption) {
-                    $configOption = (object) $configOption;
+                // Persist config option selections using server-resolved field names (S-04)
+                foreach ($ri['config_options'] as $co) {
+                    /** @var ConfigOption $optionModel */
+                    $optionModel = $co['model'];
+                    $value       = $co['value'];
 
-                    if (in_array($configOption->option_type ?? '', ['text', 'number'])) {
-                        if (!isset($configOption->value)) {
+                    if (in_array($optionModel->type, ['text', 'number'])) {
+                        if ($value === null) {
                             continue;
                         }
                         $service->properties()->updateOrCreate(
-                            ['key' => $configOption->option_env_variable ?? $configOption->option_name ?? ''],
-                            ['name' => $configOption->option_name ?? '', 'value' => $configOption->value]
+                            ['key' => $optionModel->env_variable ?? $optionModel->name],
+                            ['name' => $optionModel->name, 'value' => $value]
                         );
                         continue;
                     }
 
-                    if (!isset($configOption->value) || $configOption->value === null) {
+                    if ($value === null) {
                         continue;
                     }
 
                     $service->configs()->create([
-                        'config_option_id' => $configOption->option_id,
-                        'config_value_id'  => $configOption->value,
+                        'config_option_id' => $optionModel->id,
+                        'config_value_id'  => $value,
                     ]);
                 }
 
@@ -243,6 +276,10 @@ class OrderController extends UserApiController
                     'meta' => [
                         'invoice_id'     => $invoice?->id,
                         'invoice_status' => $invoice?->status,
+                        'services'       => $order->services->map(fn ($s) => [
+                            'id'     => $s->id,
+                            'status' => $s->status,
+                        ]),
                     ],
                 ])
                 ->response()
