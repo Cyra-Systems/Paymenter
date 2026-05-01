@@ -161,12 +161,14 @@ class Navigation
                                 'name' => 'API Keys',
                                 'url' => route('account.api-keys'),
                                 'params' => [],
+                                'condition' => (bool) config('settings.user_api_enabled', true),
                                 'priority' => 60,
                             ],
                             [
                                 'name' => 'Webhooks',
                                 'url' => route('account.webhooks'),
                                 'params' => [],
+                                'condition' => (bool) config('settings.user_api_enabled', true),
                                 'priority' => 70,
                             ],
                         ]
