@@ -29,38 +29,32 @@ class UserApi
         if (!$request->bearerToken()) {
             return response()->json([
                 'error' => [
-                    'code' => 'UNAUTHENTICATED',
+                    'code'    => 'UNAUTHENTICATED',
                     'message' => 'The request is missing a valid bearer token.',
                 ],
             ], 401);
         }
 
+        // Combine enabled + type checks into one query so all failure paths
+        // return the same response, preventing token-validity probing (S-16).
         $token = ApiKey::where('token', hash('sha256', $request->bearerToken()))
             ->where('enabled', true)
+            ->where('type', 'user')
             ->first();
 
         if (!$token) {
             return response()->json([
                 'error' => [
-                    'code' => 'UNAUTHENTICATED',
+                    'code'    => 'UNAUTHENTICATED',
                     'message' => 'The provided API key is invalid or has been disabled.',
                 ],
             ], 401);
         }
 
-        if ($token->type !== 'user') {
-            return response()->json([
-                'error' => [
-                    'code' => 'FORBIDDEN',
-                    'message' => 'This API key does not have access to the user API.',
-                ],
-            ], 403);
-        }
-
         if ($token->ip_addresses && !in_array($request->ip(), $token->ip_addresses)) {
             return response()->json([
                 'error' => [
-                    'code' => 'FORBIDDEN',
+                    'code'    => 'FORBIDDEN',
                     'message' => 'Your IP address is not allowed to use this API key.',
                 ],
             ], 403);
@@ -69,7 +63,7 @@ class UserApi
         if (!$token->user_id) {
             return response()->json([
                 'error' => [
-                    'code' => 'FORBIDDEN',
+                    'code'    => 'FORBIDDEN',
                     'message' => 'This API key is not associated with a user account.',
                 ],
             ], 403);
@@ -80,14 +74,17 @@ class UserApi
         if (!$user) {
             return response()->json([
                 'error' => [
-                    'code' => 'FORBIDDEN',
+                    'code'    => 'FORBIDDEN',
                     'message' => 'The user associated with this API key no longer exists.',
                 ],
             ], 403);
         }
 
-        $token->last_used_at = now();
-        $token->save();
+        // Debounce: only write last_used_at when stale by more than 60 seconds (S-01).
+        // updateQuietly() skips updated_at and model events, keeping this write cheap.
+        if (!$token->last_used_at || $token->last_used_at->diffInSeconds(now()) > 60) {
+            $token->updateQuietly(['last_used_at' => now()]);
+        }
 
         $request->attributes->set('api_key', $token);
         $request->attributes->set('api_key_permissions', $token->permissions ?? []);
