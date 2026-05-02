@@ -4,10 +4,14 @@ namespace App\Livewire\Products;
 
 use App\Classes\Cart;
 use App\Classes\Price;
+use App\Domains\Registrars\EnomRegistrar;
+use App\Domains\Services\SubdomainAllocator;
 use App\Helpers\ExtensionHelper;
 use App\Livewire\Component;
 use App\Models\Category;
+use App\Models\DomainTld;
 use App\Models\Plan;
+use Exception;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
@@ -38,6 +42,22 @@ class Checkout extends Component
 
     #[Url(as: 'edit'), Locked]
     public $cartProductKey = null;
+
+    public ?string $domainPath = null;
+
+    public string $domainSld = '';
+
+    public string $domainTld = '';
+
+    public string $domainForwardHostname = '';
+
+    public string $domainForwardTarget = '';
+
+    public string $domainSubdomainPrefix = '';
+
+    public ?string $domainAvailability = null;
+
+    public ?string $domainSubdomainStatus = null;
 
     public function mount($product)
     {
@@ -143,6 +163,144 @@ class Checkout extends Component
         return once(fn () => ExtensionHelper::getCheckoutConfig($this->product, $this->checkoutConfig));
     }
 
+    public function allowedDomainPaths(): array
+    {
+        $allowed = $this->product->allowed_domain_paths;
+        if (empty($allowed) || ! is_array($allowed)) {
+            return ['custom', 'forward', 'subdomain'];
+        }
+
+        return array_values(array_filter($allowed, fn ($v) => in_array($v, ['custom', 'forward', 'subdomain'], true)));
+    }
+
+    public function pickDomainPath(string $path): void
+    {
+        if (! in_array($path, $this->allowedDomainPaths(), true)) {
+            return;
+        }
+        $this->domainPath = $path;
+        $this->domainAvailability = null;
+        $this->domainSubdomainStatus = null;
+    }
+
+    public function checkDomainAvailability(): void
+    {
+        $sld = strtolower(trim($this->domainSld));
+        $tld = strtolower(ltrim(trim($this->domainTld), '.'));
+
+        if ($sld === '' || $tld === '') {
+            $this->domainAvailability = 'Enter both SLD and TLD.';
+
+            return;
+        }
+
+        $tldRecord = DomainTld::query()->where('tld', $tld)->where('enabled', true)->first();
+        if (! $tldRecord) {
+            $this->domainAvailability = "We don't support .{$tld} right now.";
+
+            return;
+        }
+
+        try {
+            $registrar = new EnomRegistrar;
+            if ($registrar->check($sld, $tld)) {
+                $price = number_format($tldRecord->priceWithMargin('register_price'), 2);
+                $this->domainAvailability = "{$sld}.{$tld} available — {$tldRecord->currency_code} {$price}/yr";
+            } else {
+                $this->domainAvailability = "{$sld}.{$tld} is taken.";
+            }
+        } catch (Exception $e) {
+            $this->domainAvailability = 'Lookup failed: '.$e->getMessage();
+        }
+    }
+
+    public function checkSubdomainAvailability(): void
+    {
+        $allocator = app(SubdomainAllocator::class);
+        if (! $allocator->isConfigured()) {
+            $this->domainSubdomainStatus = 'Subdomain hosting is not configured by the administrator.';
+
+            return;
+        }
+        if (! $allocator->isValidPrefix($this->domainSubdomainPrefix)) {
+            $this->domainSubdomainStatus = 'Invalid prefix.';
+
+            return;
+        }
+
+        $this->domainSubdomainStatus = $allocator->isAvailable($this->domainSubdomainPrefix)
+            ? $allocator->build($this->domainSubdomainPrefix).' is available.'
+            : 'That prefix is already taken.';
+    }
+
+    public function subdomainBase(): string
+    {
+        return (string) config('settings.domains.subdomain_base', '');
+    }
+
+    public function proxyTargetHost(): string
+    {
+        return (string) config('settings.domains.npm_proxy_target_host', '');
+    }
+
+    private function validateDomainStep(): void
+    {
+        $allowed = $this->allowedDomainPaths();
+        if (! in_array($this->domainPath, $allowed, true)) {
+            throw new \Illuminate\Validation\ValidationException(
+                validator(['domainPath' => $this->domainPath], ['domainPath' => 'in:'.implode(',', $allowed)])
+            );
+        }
+
+        if ($this->domainPath === 'custom') {
+            $tld = strtolower(ltrim(trim($this->domainTld), '.'));
+            if ($tld === '' || ! DomainTld::query()->where('tld', $tld)->where('enabled', true)->exists()) {
+                throw new \Illuminate\Validation\ValidationException(
+                    validator(['domainTld' => $tld], ['domainTld' => 'required'])->after(function ($v) use ($tld) {
+                        $v->errors()->add('domainTld', "We don't support .{$tld} right now.");
+                    })
+                );
+            }
+        }
+
+        if ($this->domainPath === 'subdomain') {
+            $allocator = app(SubdomainAllocator::class);
+            if (! $allocator->isConfigured() || ! $allocator->isAvailable($this->domainSubdomainPrefix)) {
+                throw new \Illuminate\Validation\ValidationException(
+                    validator(['domainSubdomainPrefix' => $this->domainSubdomainPrefix], [
+                        'domainSubdomainPrefix' => 'required',
+                    ])->after(function ($v) {
+                        $v->errors()->add('domainSubdomainPrefix', 'Subdomain prefix is unavailable.');
+                    })
+                );
+            }
+        }
+    }
+
+    private function resolveDomainCheckoutConfig(): array
+    {
+        if (! $this->product->requires_domain) {
+            return [];
+        }
+
+        return match ($this->domainPath) {
+            'custom' => [
+                'domain_path' => 'custom',
+                'domain_fqdn' => strtolower(trim($this->domainSld)).'.'.strtolower(ltrim(trim($this->domainTld), '.')),
+            ],
+            'forward' => [
+                'domain_path' => 'forward',
+                'domain_fqdn' => strtolower(trim($this->domainForwardHostname)),
+                'domain_forward_target' => trim($this->domainForwardTarget),
+            ],
+            'subdomain' => [
+                'domain_path' => 'subdomain',
+                'domain_fqdn' => app(SubdomainAllocator::class)->build($this->domainSubdomainPrefix),
+            ],
+            default => [],
+        };
+    }
+
     public function rules()
     {
         $rules = [
@@ -219,6 +377,12 @@ class Checkout extends Component
     {
         // Do the checkout
         // First we validate the plans
+        if ($this->product->requires_domain) {
+            $this->validateDomainStep();
+
+            $this->checkoutConfig = array_merge($this->checkoutConfig, $this->resolveDomainCheckoutConfig());
+        }
+
         $this->validate(attributes: $this->attributes());
 
         // Has this product quantity = no?

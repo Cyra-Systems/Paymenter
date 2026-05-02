@@ -257,4 +257,26 @@ class Service extends Model implements Auditable
     {
         return $this->belongsTo(BillingAgreement::class, 'billing_agreement_id');
     }
+
+    public function domainBindings()
+    {
+        return $this->hasMany(DomainServiceBinding::class);
+    }
+
+    public function primaryDomainBinding()
+    {
+        return $this->hasOne(DomainServiceBinding::class)->where('status', DomainServiceBinding::STATUS_ACTIVE);
+    }
+
+    public function domain()
+    {
+        return $this->hasOneThrough(
+            Domain::class,
+            DomainServiceBinding::class,
+            'service_id',
+            'id',
+            'id',
+            'domain_id',
+        )->where('domain_service_bindings.status', DomainServiceBinding::STATUS_ACTIVE);
+    }
 }

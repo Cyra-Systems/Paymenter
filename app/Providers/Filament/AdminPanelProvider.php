@@ -88,6 +88,7 @@ class AdminPanelProvider extends PanelProvider
                 }
             )
             ->navigationGroups([
+                'Domains',
                 'Administration',
                 'Configuration',
                 'Extensions',

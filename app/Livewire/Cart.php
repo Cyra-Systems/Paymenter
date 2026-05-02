@@ -6,6 +6,7 @@ use App\Classes\Cart as ClassesCart;
 use App\Classes\Price;
 use App\Exceptions\DisplayException;
 use App\Helpers\ExtensionHelper;
+use App\Jobs\Domain\PostCheckoutBindJob;
 use App\Jobs\Server\CreateJob;
 use App\Models\Invoice;
 use App\Models\Order;
@@ -161,6 +162,7 @@ class Cart extends Component
             }
 
             // Create the services
+            $domainBindings = [];
             foreach ($cart->items as $item) {
                 // Is it a lifetime coupon, then we can adjust the price of the service
                 if ($this->coupon && ($this->coupon->recurring === null || (int) $this->coupon->recurring == 1)) {
@@ -187,6 +189,13 @@ class Cart extends Component
                     ], [
                         'value' => $value,
                     ]);
+                }
+
+                if (! empty(((array) $item->checkout_config)['domain_path'] ?? null)) {
+                    $domainBindings[] = [
+                        'service_id' => $service->id,
+                        'config' => (array) $item->checkout_config,
+                    ];
                 }
 
                 foreach ($item->config_options as $configOption) {
@@ -236,6 +245,14 @@ class Cart extends Component
 
             // Commit the transaction
             DB::commit();
+
+            // Dispatch domain binding jobs for items that picked a domain path during checkout.
+            foreach ($domainBindings as $binding) {
+                $service = Service::find($binding['service_id']);
+                if ($service) {
+                    PostCheckoutBindJob::dispatch($service, $binding['config']);
+                }
+            }
 
             // Clear the cart
             ClassesCart::clear();

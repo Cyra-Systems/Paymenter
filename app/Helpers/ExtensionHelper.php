@@ -645,6 +645,33 @@ class ExtensionHelper
     }
 
     /**
+     * Notify the server extension that the bound hostname has changed.
+     * Extensions opt in by implementing updateHostname(); when absent this is a no-op.
+     */
+    public static function updateServerHostname(Service $service, string $newHostname, ?string $previousHostname): mixed
+    {
+        $server = $service->product?->server;
+        if (!$server || !self::hasFunction($server, 'updateHostname')) {
+            return null;
+        }
+
+        self::recordAudit($service, 'extension_action', [], [
+            'action' => 'update_hostname',
+            'new' => $newHostname,
+            'previous' => $previousHostname,
+        ]);
+
+        return self::getExtension('server', $server->extension, $server->settings)
+            ->updateHostname(
+                $service,
+                self::settingsToArray($service->product->settings),
+                self::getServiceProperties($service),
+                $newHostname,
+                $previousHostname,
+            );
+    }
+
+    /**
      * Get actions for service
      */
     public static function getActions(Service $service)

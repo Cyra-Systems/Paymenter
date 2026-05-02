@@ -105,6 +105,13 @@ class Navigation
                     'priority' => 20,
                 ],
                 [
+                    'name' => __('navigation.domains'),
+                    'url' => route('domains'),
+                    'icon' => 'ri-global',
+                    'condition' => Auth::check(),
+                    'priority' => 25,
+                ],
+                [
                     'name' => __('navigation.invoices'),
                     'url' => route('invoices'),
                     'icon' => 'ri-receipt',

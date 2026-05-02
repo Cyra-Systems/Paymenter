@@ -4,22 +4,34 @@ namespace Paymenter\Extensions\Servers\Enom;
 
 use App\Attributes\ExtensionMeta;
 use App\Classes\Extension\Server;
+use App\Domains\Registrars\EnomRegistrar;
+use App\Domains\Services\DomainBindingService;
+use App\Domains\Services\DomainProvisioningService;
 use App\Helpers\ExtensionHelper;
+use App\Models\Domain;
+use App\Models\DomainTld;
 use App\Models\Service;
-use Carbon\Carbon;
 use Exception;
-use Illuminate\Support\Facades\Http;
 
 #[ExtensionMeta(
     name: 'Enom Domain Registrar',
-    description: 'Register and renew domains through the Enom XML API.',
-    version: '1.1.0',
+    description: 'Register and renew domains through the Enom XML API. This extension is now a thin facade over the core Domain Management pillar (App\\Domains).',
+    version: '2.0.0',
     author: 'Paymenteer',
     url: '',
     icon: ''
 )]
 class Enom extends Server
 {
+    private function registrar(): EnomRegistrar
+    {
+        return new EnomRegistrar([
+            'username' => $this->config('username'),
+            'password' => $this->config('password'),
+            'sandbox' => (bool) $this->config('sandbox'),
+        ]);
+    }
+
     private function companionStatusDescription(): string
     {
         try {
@@ -31,302 +43,6 @@ class Enom extends Server
         }
     }
 
-    private function apiUrl(): string
-    {
-        return $this->config('sandbox')
-            ? 'https://resellertest.enom.com/interface.asp'
-            : 'https://reseller.enom.com/interface.asp';
-    }
-
-    private function request(string $command, array $params = []): array
-    {
-        $response = Http::timeout(30)->get($this->apiUrl(), array_merge([
-            'command' => $command,
-            'uid' => $this->config('username'),
-            'pw' => $this->config('password'),
-            'responsetype' => 'xml',
-        ], $params));
-
-        if (! $response->successful()) {
-            throw new Exception('Failed to connect to the Enom API: HTTP ' . $response->status());
-        }
-
-        $xml = simplexml_load_string($response->body());
-        if ($xml === false) {
-            throw new Exception('Failed to parse the Enom API response.');
-        }
-
-        $result = json_decode(json_encode($xml), true) ?: [];
-        $errCount = (int) ($result['ErrCount'] ?? 0);
-
-        if ($errCount > 0) {
-            $errors = $result['errors'] ?? [];
-            $message = $errors['Err1'] ?? $result['Err1'] ?? 'Unknown Enom API error.';
-            throw new Exception((string) $message);
-        }
-
-        return $result;
-    }
-
-    private function getDomainParts(array $settings, array $properties): array
-    {
-        $sld = strtolower(trim((string) ($properties['domain'] ?? '')));
-        $tld = strtolower(trim((string) ($settings['tld'] ?? '')));
-
-        if ($sld === '' || $tld === '') {
-            throw new Exception('Domain SLD or TLD is missing.');
-        }
-
-        return [
-            'sld' => $sld,
-            'tld' => $tld,
-            'domain' => $sld . '.' . $tld,
-        ];
-    }
-
-    private function domainAvailable(string $sld, string $tld): bool
-    {
-        $availability = $this->request('Check', [
-            'SLD' => $sld,
-            'TLD' => $tld,
-        ]);
-
-        return (int) ($availability['RRPCode'] ?? 0) === 210;
-    }
-
-    private function buildContact(string $prefix, object $user): array
-    {
-        $name = trim((string) ($user->name ?? ''));
-        $parts = preg_split('/\s+/', $name, 2) ?: [];
-        $firstName = $parts[0] ?: 'Domain';
-        $lastName = $parts[1] ?? 'Owner';
-
-        return [
-            "{$prefix}FirstName" => $firstName,
-            "{$prefix}LastName" => $lastName,
-            "{$prefix}EmailAddress" => (string) ($user->email ?? 'noreply@example.com'),
-            "{$prefix}Phone" => (string) ($user->phone ?? '+1.5555555555'),
-            "{$prefix}Address1" => (string) ($user->address ?? '123 Main Street'),
-            "{$prefix}City" => (string) ($user->city ?? 'Unknown'),
-            "{$prefix}StateProvince" => (string) ($user->state ?? 'NA'),
-            "{$prefix}PostalCode" => (string) ($user->postcode ?? '00000'),
-            "{$prefix}Country" => strtoupper((string) ($user->country ?? 'US')),
-        ];
-    }
-
-    private function saveProperty(Service $service, string $key, string $name, string $value): void
-    {
-        $service->properties()->updateOrCreate([
-            'key' => $key,
-        ], [
-            'name' => $name,
-            'value' => $value,
-        ]);
-    }
-
-    private function normalizedResult(array $result): array
-    {
-        $normalized = [];
-
-        foreach ($result as $key => $value) {
-            $normalized[strtolower((string) $key)] = $value;
-        }
-
-        return $normalized;
-    }
-
-    private function normalizeNameserver(?string $value): ?string
-    {
-        $value = strtolower(trim((string) $value));
-        $value = preg_replace('#^https?://#', '', $value) ?? $value;
-        $value = preg_replace('#/.*$#', '', $value) ?? $value;
-        $value = trim($value, '.');
-
-        return $value !== '' ? $value : null;
-    }
-
-    private function parseNameservers(array $result): array
-    {
-        $nameservers = [];
-
-        $walk = function (array $node) use (&$walk, &$nameservers): void {
-            foreach ($node as $key => $value) {
-                $lowerKey = strtolower((string) $key);
-
-                if (is_array($value)) {
-                    $walk($value);
-                    continue;
-                }
-
-                if (! preg_match('/^ns\d+$/', $lowerKey) && $lowerKey !== 'nameserver') {
-                    continue;
-                }
-
-                $host = $this->normalizeNameserver((string) $value);
-                if ($host) {
-                    $nameservers[] = $host;
-                }
-            }
-        };
-
-        $walk($result);
-
-        return array_values(array_unique($nameservers));
-    }
-
-    private function parseDate(array $result, array $keys): ?Carbon
-    {
-        $normalized = $this->normalizedResult($result);
-
-        foreach ($keys as $key) {
-            $value = trim((string) ($normalized[strtolower($key)] ?? ''));
-            if ($value === '') {
-                continue;
-            }
-
-            try {
-                return Carbon::parse($value);
-            } catch (\Throwable) {
-                continue;
-            }
-        }
-
-        return null;
-    }
-
-    private function parseBool(array $result, array $keys): ?bool
-    {
-        $normalized = $this->normalizedResult($result);
-
-        foreach ($keys as $key) {
-            if (! array_key_exists(strtolower($key), $normalized)) {
-                continue;
-            }
-
-            $value = strtolower(trim((string) $normalized[strtolower($key)]));
-
-            if (in_array($value, ['1', 'true', 'yes', 'on', 'locked', 'enabled'], true)) {
-                return true;
-            }
-
-            if (in_array($value, ['0', 'false', 'no', 'off', 'unlocked', 'disabled'], true)) {
-                return false;
-            }
-        }
-
-        return null;
-    }
-
-    private function parseString(array $result, array $keys): ?string
-    {
-        $normalized = $this->normalizedResult($result);
-
-        foreach ($keys as $key) {
-            $value = trim((string) ($normalized[strtolower($key)] ?? ''));
-            if ($value !== '') {
-                return $value;
-            }
-        }
-
-        return null;
-    }
-
-    private function normalizeDnsHostname(?string $value): string
-    {
-        $value = trim((string) $value);
-        if ($value === '' || $value === '@') {
-            return '@';
-        }
-
-        return trim($value, '.');
-    }
-
-    private function normalizeDnsType(?string $value): string
-    {
-        return strtoupper(trim((string) $value));
-    }
-
-    private function parseInteger(array $result, array $keys): ?int
-    {
-        $normalized = $this->normalizedResult($result);
-
-        foreach ($keys as $key) {
-            $raw = $normalized[strtolower($key)] ?? null;
-            if ($raw === null || $raw === '') {
-                continue;
-            }
-
-            if (is_numeric($raw)) {
-                return (int) $raw;
-            }
-        }
-
-        return null;
-    }
-
-    private function extractDnsRecords(array $node, array &$records): void
-    {
-        $normalized = $this->normalizedResult($node);
-        $type = $this->normalizeDnsType($normalized['recordtype'] ?? $normalized['type'] ?? '');
-        $address = trim((string) ($normalized['address'] ?? $normalized['addr'] ?? $normalized['value'] ?? $normalized['destination'] ?? $normalized['target'] ?? ''));
-
-        if ($type !== '' && $address !== '') {
-            $records[] = [
-                'hostname' => $this->normalizeDnsHostname($normalized['hostname'] ?? $normalized['host'] ?? $normalized['name'] ?? '@'),
-                'type' => $type,
-                'address' => $address,
-                'priority' => $this->parseInteger($normalized, ['priority', 'mxpref', 'preference']),
-            ];
-        }
-
-        foreach ($node as $value) {
-            if (is_array($value)) {
-                $this->extractDnsRecords($value, $records);
-            }
-        }
-    }
-
-    private function parseDnsPayload(array $result): array
-    {
-        $records = [];
-        $this->extractDnsRecords($result, $records);
-
-        $uniqueRecords = [];
-        foreach ($records as $record) {
-            $signature = implode('|', [
-                $record['hostname'],
-                $record['type'],
-                $record['address'],
-                (string) ($record['priority'] ?? ''),
-            ]);
-
-            $uniqueRecords[$signature] = $record;
-        }
-
-        return [
-            'nameservers' => $this->parseNameservers($result),
-            'records' => array_values($uniqueRecords),
-            'raw' => $result,
-        ];
-    }
-
-    private function applyPostRegistrationOptions(array $settings, string $sld, string $tld): void
-    {
-        $this->request('SetRenew', [
-            'SLD' => $sld,
-            'TLD' => $tld,
-            'AutoRenew' => ! empty($settings['auto_renew']) ? 1 : 0,
-        ]);
-
-        if (! empty($settings['lock'])) {
-            $this->request('SetRegLock', [
-                'SLD' => $sld,
-                'TLD' => $tld,
-                'UnlockRegistrar' => 0,
-            ]);
-        }
-    }
-
     public function getConfig($values = []): array
     {
         return [
@@ -334,7 +50,7 @@ class Enom extends Server
                 'name' => 'username',
                 'label' => 'Enom Username',
                 'type' => 'text',
-                'description' => 'Your Enom reseller username. ' . $this->companionStatusDescription(),
+                'description' => 'Your Enom reseller username. '.$this->companionStatusDescription(),
                 'required' => true,
             ],
             [
@@ -369,7 +85,7 @@ class Enom extends Server
                 'name' => 'years',
                 'label' => 'Registration Period',
                 'type' => 'number',
-                'description' => 'How many years E should register or renew the domain for.',
+                'description' => 'How many years to register or renew the domain for.',
                 'required' => true,
                 'default' => 1,
                 'min_value' => 1,
@@ -379,7 +95,7 @@ class Enom extends Server
                 'name' => 'id_protect',
                 'label' => 'WHOIS Privacy',
                 'type' => 'checkbox',
-                'description' => 'Requestprivacy protection during registration when the TLD supports it.',
+                'description' => 'Request privacy protection during registration when the TLD supports it.',
             ],
             [
                 'name' => 'auto_renew',
@@ -405,10 +121,10 @@ class Enom extends Server
         if ($domain !== '' && $tld !== '') {
             $availabilityValidation[] = function (string $attribute, mixed $value, \Closure $fail) use ($domain, $tld) {
                 try {
-                    if (! $this->domainAvailable($domain, $tld)) {
+                    if (! $this->registrar()->check($domain, $tld)) {
                         $fail('The selected domain is not available.');
                     }
-                } catch (Exception $exception) {
+                } catch (Exception) {
                     $fail('We could not verify domain availability right now. Please try again in a moment.');
                 }
             };
@@ -431,59 +147,43 @@ class Enom extends Server
 
     public function testConfig(): bool|string
     {
-        try {
-            $response = $this->request('CheckLogin');
-            $status = strtolower((string) ($response['LoginStatus'] ?? ''));
-
-            if ($status !== '' && $status !== 'success') {
-                return 'Login failed: ' . $status;
-            }
-
-            return true;
-        } catch (Exception $exception) {
-            return $exception->getMessage();
-        }
+        return $this->registrar()->testConnection();
     }
 
     public function createServer(Service $service, $settings, $properties)
     {
-        ['sld' => $sld, 'tld' => $tld, 'domain' => $domain] = $this->getDomainParts($settings, $properties);
+        $registrar = $this->registrar();
 
-        if (! $this->domainAvailable($sld, $tld)) {
-            throw new Exception('Domain ' . $domain . ' is not available for registration.');
+        $tld = strtolower(ltrim(trim((string) ($settings['tld'] ?? '')), '.'));
+        if ($tld !== '' && ! DomainTld::query()->where('tld', $tld)->where('enabled', true)->exists()) {
+            DomainTld::firstOrCreate(
+                ['tld' => $tld],
+                [
+                    'enabled' => true,
+                    'register_price' => 0,
+                    'transfer_price' => 0,
+                    'renewal_price' => 0,
+                    'redemption_price' => 0,
+                    'currency_code' => $service->currency_code ?? 'USD',
+                    'min_years' => 1,
+                    'max_years' => 10,
+                ]
+            );
         }
 
-        $user = $service->user;
-        $contacts = array_merge(
-            $this->buildContact('Registrant', $user),
-            $this->buildContact('Admin', $user),
-            $this->buildContact('Tech', $user),
-            $this->buildContact('AuxBilling', $user),
+        $domain = app(DomainProvisioningService::class)
+            ->registerForService($service, $settings, $properties, $registrar);
+
+        app(DomainBindingService::class)
+            ->bind($domain, $service, Domain::TYPE_PRIMARY, $domain->fqdn);
+
+        $service->properties()->updateOrCreate(
+            ['key' => 'enom_domain'],
+            ['name' => 'Enom domain', 'value' => $domain->fqdn],
         );
 
-        $params = array_merge([
-            'SLD' => $sld,
-            'TLD' => $tld,
-            'NumYears' => (int) ($settings['years'] ?? 1),
-            'UseDNS' => 'default',
-        ], $contacts);
-
-        if (! empty($settings['id_protect'])) {
-            $params['AddPrivacy'] = 1;
-        }
-
-        $purchase = $this->request('Purchase', $params);
-
-        if ((int) ($purchase['RRPCode'] ?? 0) !== 200) {
-            $message = $purchase['RRPText'] ?? ('Domain registration failed for ' . $domain . '.');
-            throw new Exception((string) $message);
-        }
-
-        $this->applyPostRegistrationOptions($settings, $sld, $tld);
-        $this->saveProperty($service, 'enom_domain', 'Enom domain', $domain);
-
         return [
-            'domain' => $domain,
+            'domain' => $domain->fqdn,
             'status' => 'active',
         ];
     }
@@ -500,186 +200,103 @@ class Enom extends Server
 
     public function terminateServer(Service $service, $settings, $properties)
     {
-        ['sld' => $sld, 'tld' => $tld] = $this->getDomainParts($settings, $properties);
+        $domain = $this->resolveDomain($service, $settings, $properties);
+        if ($domain) {
+            $registrar = $this->registrar();
+            try {
+                $registrar->request('SetRenew', [
+                    'SLD' => $domain->sld,
+                    'TLD' => $domain->tld,
+                    'AutoRenew' => 0,
+                ]);
+            } catch (Exception) {
+                // Swallow — termination is best-effort at the registrar layer.
+            }
 
-        $this->request('SetRenew', [
-            'SLD' => $sld,
-            'TLD' => $tld,
-            'AutoRenew' => 0,
-        ]);
+            $domain->update(['auto_renew' => false, 'status' => Domain::STATUS_CANCELLED]);
+
+            $domain->bindings()->where('service_id', $service->id)->get()->each(function ($binding) {
+                app(DomainBindingService::class)->unbind($binding);
+            });
+        }
 
         return true;
     }
 
     public function renewServer(Service $service, $settings, $properties)
     {
-        ['sld' => $sld, 'tld' => $tld, 'domain' => $domain] = $this->getDomainParts($settings, $properties);
-
-        $result = $this->request('Extend', [
-            'SLD' => $sld,
-            'TLD' => $tld,
-            'NumYears' => (int) ($settings['years'] ?? 1),
-        ]);
-
-        if ((int) ($result['RRPCode'] ?? 0) !== 200) {
-            $message = $result['RRPText'] ?? ('Domain renewal failed for ' . $domain . '.');
-            throw new Exception((string) $message);
+        $domain = $this->resolveDomain($service, $settings, $properties);
+        if (! $domain) {
+            throw new Exception('Domain record not found for this service.');
         }
+
+        app(DomainProvisioningService::class)->renew($domain, (int) ($settings['years'] ?? 1), $this->registrar());
 
         return true;
     }
 
     public function getDomainInfo(Service $service, $settings, $properties): array
     {
-        ['sld' => $sld, 'tld' => $tld, 'domain' => $domain] = $this->getDomainParts($settings, $properties);
-
-        $result = $this->request('GetDomainInfo', [
-            'SLD' => $sld,
-            'TLD' => $tld,
-        ]);
-
-        $expiresAt = $this->parseDate($result, ['ExpirationDate', 'Expiration', 'ExpireDate', 'ExpDate']);
-        $lock = $this->parseBool($result, ['RegistrarLock', 'RegLock', 'Lock']);
-        $authCode = $this->parseString($result, ['AuthInfo', 'AuthCode', 'EPPKey', 'TransferKey']);
-        $autoRenew = $this->parseBool($result, ['AutoRenew']);
-        $status = $this->parseString($result, ['Status', 'RRPText']);
-        $nameservers = $this->parseNameservers($result);
-
-        if ($expiresAt) {
-            $service->forceFill([
-                'expires_at' => $expiresAt,
-            ])->save();
+        $domain = $this->resolveDomain($service, $settings, $properties);
+        if (! $domain) {
+            throw new Exception('Domain record not found for this service.');
         }
 
-        $this->saveProperty($service, 'enom_domain', 'Enom domain', $domain);
+        $info = $this->registrar()->getInfo($domain);
 
-        foreach (range(1, 4) as $index) {
-            $value = $nameservers[$index - 1] ?? '';
-            $this->saveProperty($service, 'nameserver_' . $index, 'Nameserver ' . $index, $value);
+        if ($info['expires_at']) {
+            $domain->update(['expires_at' => $info['expires_at'], 'last_synced_at' => now()]);
+            $service->forceFill(['expires_at' => $info['expires_at']])->save();
         }
 
-        if ($lock !== null) {
-            $this->saveProperty($service, 'registrar_lock', 'Registrar Lock', $lock ? '1' : '0');
-        }
+        $info['domain'] = $domain->fqdn;
 
-        if ($authCode) {
-            $this->saveProperty($service, 'transfer_auth_code', 'Transfer Auth Code', $authCode);
-        }
-
-        return [
-            'domain' => $domain,
-            'nameservers' => $nameservers,
-            'locked' => $lock,
-            'auth_code' => $authCode,
-            'auto_renew' => $autoRenew,
-            'status' => $status,
-            'expires_at' => $expiresAt,
-            'raw' => $result,
-        ];
+        return $info;
     }
 
     public function updateNameservers(Service $service, $settings, $properties, array $nameservers): array
     {
-        ['sld' => $sld, 'tld' => $tld] = $this->getDomainParts($settings, $properties);
-
-        $normalized = array_values(array_filter(array_map(
-            fn ($value) => $this->normalizeNameserver((string) $value),
-            $nameservers
-        )));
-
-        if (count($normalized) < 2) {
-            throw new Exception('At least two valid nameservers are required.');
+        $domain = $this->resolveDomain($service, $settings, $properties);
+        if (! $domain) {
+            throw new Exception('Domain record not found for this service.');
         }
 
-        $params = [
-            'SLD' => $sld,
-            'TLD' => $tld,
-        ];
-
-        foreach ($normalized as $index => $nameserver) {
-            $params['NS' . ($index + 1)] = $nameserver;
-        }
-
-        $result = $this->request('ModifyNS', $params);
-        $code = (int) ($result['RRPCode'] ?? 200);
-
-        if ($code !== 200) {
-            throw new Exception((string) ($result['RRPText'] ?? 'Unable to update nameservers right now.'));
-        }
+        $this->registrar()->setNameservers($domain, $nameservers);
 
         return $this->getDomainInfo($service, $settings, $properties);
     }
 
     public function setRegistrarLock(Service $service, $settings, $properties, bool $lock): array
     {
-        ['sld' => $sld, 'tld' => $tld] = $this->getDomainParts($settings, $properties);
-
-        $result = $this->request('SetRegLock', [
-            'SLD' => $sld,
-            'TLD' => $tld,
-            'UnlockRegistrar' => $lock ? 0 : 1,
-        ]);
-
-        $code = (int) ($result['RRPCode'] ?? 200);
-
-        if ($code !== 200) {
-            throw new Exception((string) ($result['RRPText'] ?? 'Unable to update the registrar lock right now.'));
+        $domain = $this->resolveDomain($service, $settings, $properties);
+        if (! $domain) {
+            throw new Exception('Domain record not found for this service.');
         }
+
+        $this->registrar()->setLock($domain, $lock);
+        $domain->update(['locked' => $lock]);
 
         return $this->getDomainInfo($service, $settings, $properties);
     }
 
     public function getDNS(Service $service, $settings, $properties): array
     {
-        ['sld' => $sld, 'tld' => $tld] = $this->getDomainParts($settings, $properties);
+        $domain = $this->resolveDomain($service, $settings, $properties);
+        if (! $domain) {
+            throw new Exception('Domain record not found for this service.');
+        }
 
-        $result = $this->request('GetDNS', [
-            'SLD' => $sld,
-            'TLD' => $tld,
-        ]);
-
-        return $this->parseDnsPayload($result);
+        return $this->registrar()->getDns($domain);
     }
 
     public function setDNS(Service $service, $settings, $properties, array $records): array
     {
-        ['sld' => $sld, 'tld' => $tld] = $this->getDomainParts($settings, $properties);
-
-        if ($records === []) {
-            throw new Exception('Add at least one DNS record before saving.');
+        $domain = $this->resolveDomain($service, $settings, $properties);
+        if (! $domain) {
+            throw new Exception('Domain record not found for this service.');
         }
 
-        $params = [
-            'SLD' => $sld,
-            'TLD' => $tld,
-        ];
-
-        foreach (array_values($records) as $index => $record) {
-            $position = $index + 1;
-            $type = $this->normalizeDnsType($record['type'] ?? '');
-            $address = trim((string) ($record['address'] ?? ''));
-
-            if ($type === '' || $address === '') {
-                throw new Exception('Each DNS record needs a type and value.');
-            }
-
-            $params['HostName' . $position] = $this->normalizeDnsHostname($record['hostname'] ?? '@');
-            $params['RecordType' . $position] = $type;
-            $params['Address' . $position] = $address;
-
-            if (isset($record['priority']) && $record['priority'] !== '' && $record['priority'] !== null) {
-                $params['Priority' . $position] = (int) $record['priority'];
-            }
-        }
-
-        $result = $this->request('SetDNSHost', $params);
-        $code = (int) ($result['RRPCode'] ?? 200);
-
-        if ($code !== 200) {
-            throw new Exception((string) ($result['RRPText'] ?? 'Unable to update DNS records right now.'));
-        }
-
-        return $this->getDNS($service, $settings, $properties);
+        return $this->registrar()->setDns($domain, $records);
     }
 
     public function getNameServers(Service $service, $settings, $properties): array
@@ -694,77 +311,15 @@ class Enom extends Server
         return true;
     }
 
-    public function registerChildNS(Service $service, $settings, $properties, string $nameserver, string $ip): bool
+    public function checkDomain(string $sld, string $tld): bool
     {
-        $this->request('RegisterNameServer', [
-            'NS' => $this->normalizeNameserver($nameserver),
-            'IP' => trim($ip),
-        ]);
-
-        return true;
-    }
-
-    public function updateChildNS(Service $service, $settings, $properties, string $nameserver, string $oldIp, string $newIp): bool
-    {
-        $this->request('ModifyNameServer', [
-            'NS' => $this->normalizeNameserver($nameserver),
-            'OldIP' => trim($oldIp),
-            'NewIP' => trim($newIp),
-        ]);
-
-        return true;
-    }
-
-    public function deleteChildNS(Service $service, $settings, $properties, string $nameserver): bool
-    {
-        $this->request('DeleteNameServer', [
-            'NS' => $this->normalizeNameserver($nameserver),
-        ]);
-
-        return true;
-    }
-
-    public function getDNSSEC(Service $service, $settings, $properties): array
-    {
-        ['sld' => $sld, 'tld' => $tld] = $this->getDomainParts($settings, $properties);
-
-        return $this->request('GetDNSSEC', [
-            'SLD' => $sld,
-            'TLD' => $tld,
-        ]);
-    }
-
-    public function addDNSSEC(Service $service, $settings, $properties, array $data): bool
-    {
-        ['sld' => $sld, 'tld' => $tld] = $this->getDomainParts($settings, $properties);
-
-        $this->request('AddDNSSEC', array_merge([
-            'SLD' => $sld,
-            'TLD' => $tld,
-        ], $data));
-
-        return true;
-    }
-
-    public function deleteDNSSEC(Service $service, $settings, $properties, array $data): bool
-    {
-        ['sld' => $sld, 'tld' => $tld] = $this->getDomainParts($settings, $properties);
-
-        $this->request('DeleteDNSSEC', array_merge([
-            'SLD' => $sld,
-            'TLD' => $tld,
-        ], $data));
-
-        return true;
+        return $this->registrar()->check($sld, $tld);
     }
 
     public function getActions(Service $service, $settings, $properties): array
     {
-        try {
-            ['domain' => $domain] = $this->getDomainParts($settings, $properties);
-        } catch (Exception $exception) {
-            return [];
-        }
+        $fqdn = $this->resolveDomain($service, $settings, $properties)?->fqdn
+            ?? trim((string) ($properties['domain'] ?? '')).'.'.trim((string) ($settings['tld'] ?? ''));
 
         return [
             [
@@ -775,18 +330,24 @@ class Enom extends Server
             [
                 'label' => 'WHOIS Lookup',
                 'type' => 'button',
-                'url' => 'https://www.whois.com/whois/' . rawurlencode($domain),
+                'url' => 'https://www.whois.com/whois/'.rawurlencode($fqdn),
             ],
         ];
     }
 
-    public function checkDomain(string $sld, string $tld): bool
+    private function resolveDomain(Service $service, array $settings, array $properties): ?Domain
     {
-        $result = $this->request('Check', [
-            'SLD' => strtolower(trim($sld)),
-            'TLD' => strtolower(trim($tld)),
-        ]);
+        $binding = $service->primaryDomainBinding;
+        if ($binding && $binding->domain) {
+            return $binding->domain;
+        }
 
-        return (int) ($result['RRPCode'] ?? 0) === 210;
+        $sld = strtolower(trim((string) ($properties['domain'] ?? '')));
+        $tld = strtolower(ltrim(trim((string) ($settings['tld'] ?? '')), '.'));
+        if ($sld === '' || $tld === '') {
+            return null;
+        }
+
+        return Domain::query()->where('fqdn', $sld.'.'.$tld)->where('user_id', $service->user_id)->first();
     }
 }

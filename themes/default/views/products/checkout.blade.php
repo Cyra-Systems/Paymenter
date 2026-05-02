@@ -76,6 +76,10 @@
                 @endif
             </x-form.configoption>
         @endforeach
+
+        @if ($product->requires_domain)
+            @include('products._domain-step')
+        @endif
     </div>
     <div class="flex flex-col gap-2 w-full col-span-1 bg-background-secondary p-3 rounded-md h-fit">
         <h2 class="text-2xl font-semibold  mb-2">

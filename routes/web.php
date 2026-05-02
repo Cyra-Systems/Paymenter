@@ -45,6 +45,14 @@ Route::group(['middleware' => ['web', 'auth', MustVerfiyEmail::class]], function
     Route::get('/services', Services\Index::class)->name('services');
     Route::get('/services/{service}', Services\Show::class)->name('services.show')->middleware('can:view,service');
     Route::get('/services/{service}/upgrade', Services\Upgrade::class)->name('services.upgrade')->middleware('can:view,service');
+
+    Route::get('/domains', \App\Livewire\Domains\Index::class)->name('domains');
+    Route::get('/domains/register', \App\Livewire\Domains\Register::class)->name('domains.register');
+    Route::get('/domains/transfer', \App\Livewire\Domains\Transfer::class)->name('domains.transfer');
+    Route::get('/domains/{domain}', \App\Livewire\Domains\Show::class)->name('domains.show')->middleware('can:view,domain');
+    Route::get('/domains/{domain}/dns', \App\Livewire\Domains\Dns::class)->name('domains.dns')->middleware('can:view,domain');
+    Route::get('/domains/{domain}/nameservers', \App\Livewire\Domains\Nameservers::class)->name('domains.nameservers')->middleware('can:view,domain');
+    Route::get('/domains/{domain}/bind', \App\Livewire\Domains\Bind::class)->name('domains.bind')->middleware('can:update,domain');
 });
 
 Route::group(['middleware' => ['web', 'auth']], function () {

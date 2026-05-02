@@ -16,6 +16,12 @@ class Product extends Model implements Auditable
 
     protected $guarded = [];
 
+    protected $casts = [
+        'requires_domain' => 'boolean',
+        'allowed_domain_paths' => 'array',
+        'subdomain_only' => 'boolean',
+    ];
+
     protected $auditInclude = [
         'name',
         'description',
