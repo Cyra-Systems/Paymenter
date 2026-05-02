@@ -1,5 +1,4 @@
 import { Livewire, Alpine } from '../../../vendor/livewire/livewire/dist/livewire.esm';
-import anchor from '@alpinejs/anchor'
 
 document.addEventListener('livewire:init', () => {
     Livewire.hook('request', ({ fail }) => {
@@ -96,8 +95,6 @@ Alpine.store('confirmation', {
         this.callback = null
     }
 })
-
-Alpine.plugin(anchor)
 
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker
