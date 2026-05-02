@@ -35,8 +35,9 @@
                         $inactiveClasses = 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700';
                     @endphp
                     <button wire:click="$set('filter', 'all')" @class([$baseClasses, $activeClasses => $this->filter === 'all', $inactiveClasses => $this->filter !== 'all'])>All</button>
-                    <button wire:click="$set('filter', 'extension')" @class([$baseClasses, $activeClasses => $this->filter === 'extension', $inactiveClasses => $this->filter !== 'extension'])>Extensions</button>
-                    <button wire:click="$set('filter', 'theme')" @class([$baseClasses, $activeClasses => $this->filter === 'theme', $inactiveClasses => $this->filter !== 'theme'])>Themes</button>
+                    <button wire:click="$set('filter', 'gateway')" @class([$baseClasses, $activeClasses => $this->filter === 'gateway', $inactiveClasses => $this->filter !== 'gateway'])>Gateways</button>
+                    <button wire:click="$set('filter', 'server')" @class([$baseClasses, $activeClasses => $this->filter === 'server', $inactiveClasses => $this->filter !== 'server'])>Servers</button>
+                    <button wire:click="$set('filter', 'other')" @class([$baseClasses, $activeClasses => $this->filter === 'other', $inactiveClasses => $this->filter !== 'other'])>Other</button>
                 </div>
             </div>
             <div class="mt-6">
@@ -54,7 +55,7 @@
                     <div>
                         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                             @foreach ($this->extensions as $extension)
-                                <x-extension-card :extension="$extension" :key="$extension['name']" />
+                                <x-extension-card :extension="$extension" :key="$extension['id']" />
                             @endforeach
                         </div>
                         @if ($this->canLoadMore)

@@ -2,6 +2,7 @@
 
 namespace App\Admin\Resources\ServerResource\Pages;
 
+use App\Admin\Concerns\HasMigrateExtensionAction;
 use App\Admin\Resources\ServerResource;
 use App\Helpers\ExtensionHelper;
 use Filament\Actions\DeleteAction;
@@ -11,11 +12,14 @@ use Illuminate\Support\Arr;
 
 class EditServer extends EditRecord
 {
+    use HasMigrateExtensionAction;
+
     protected static string $resource = ServerResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
+            $this->migrateExtensionAction(),
             DeleteAction::make()->before(fn ($record) => ExtensionHelper::call($record, 'disabled', [$record], mayFail: true)),
         ];
     }

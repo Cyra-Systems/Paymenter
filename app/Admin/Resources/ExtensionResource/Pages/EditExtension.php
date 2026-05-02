@@ -2,6 +2,7 @@
 
 namespace App\Admin\Resources\ExtensionResource\Pages;
 
+use App\Admin\Concerns\HasMigrateExtensionAction;
 use App\Admin\Resources\ExtensionResource;
 use App\Helpers\ExtensionHelper;
 use Filament\Actions\Action;
@@ -11,11 +12,14 @@ use Illuminate\Support\Arr;
 
 class EditExtension extends EditRecord
 {
+    use HasMigrateExtensionAction;
+
     protected static string $resource = ExtensionResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
+            $this->migrateExtensionAction(),
             Action::make('uninstall')
                 ->requiresConfirmation()
                 ->color('danger')

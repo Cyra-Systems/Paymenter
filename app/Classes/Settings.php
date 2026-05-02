@@ -596,6 +596,56 @@ class Settings
                     'description' => 'Save a snapshot of important data (name, address, etc.) on the invoice when it is paid. This ensures that if someone changes their details later, old invoices will still have the correct information.',
                 ],
             ],
+            'marketplace' => [
+                [
+                    'name' => 'marketplace_url',
+                    'label' => 'Marketplace Manifest URL',
+                    'type' => 'text',
+                    'default' => '',
+                    'description' => 'URL of a JSON manifest listing extensions and themes available to this instance. Leave empty to disable.',
+                    'validation' => 'nullable|url',
+                ],
+                [
+                    'name' => 'marketplace_signing_key',
+                    'label' => 'Marketplace Signing Key',
+                    'type' => 'text',
+                    'default' => '',
+                    'encrypted' => true,
+                    'description' => 'Shared HMAC secret used to verify package signatures. Must match the key the marketplace uses to sign packages.',
+                ],
+                [
+                    'name' => 'marketplace_require_signature',
+                    'label' => 'Require Valid Signature',
+                    'type' => 'checkbox',
+                    'database_type' => 'boolean',
+                    'default' => true,
+                    'description' => 'When enabled, packages without a valid signature cannot be installed from the marketplace.',
+                ],
+            ],
+            'backups' => [
+                [
+                    'name' => 'backup_enabled',
+                    'label' => 'Enable Scheduled Backups',
+                    'type' => 'checkbox',
+                    'database_type' => 'boolean',
+                    'default' => false,
+                    'description' => 'When enabled, backups run automatically on the schedule below.',
+                ],
+                [
+                    'name' => 'backup_schedule',
+                    'label' => 'Backup Schedule (cron)',
+                    'type' => 'text',
+                    'default' => '0 3 * * *',
+                    'description' => 'Cron expression for when scheduled backups should run. Default is daily at 03:00.',
+                ],
+                [
+                    'name' => 'backup_retention_days',
+                    'label' => 'Backup Retention (days)',
+                    'type' => 'number',
+                    'default' => 14,
+                    'description' => 'Backups older than this number of days are automatically deleted.',
+                ],
+            ],
             'other' => [
                 [
                     'name' => 'gravatar_default',

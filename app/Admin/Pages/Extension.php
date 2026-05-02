@@ -7,11 +7,14 @@ use App\Admin\Resources\ExtensionResource;
 use App\Admin\Resources\GatewayResource;
 use App\Admin\Resources\ServerResource;
 use App\Helpers\ExtensionHelper;
+use App\Jobs\Marketplace\SyncMarketplaceJob;
+use App\Models\MarketplaceListing;
 use App\Services\Extensions\UploadExtensionService;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Tables\Columns\ImageColumn;
@@ -19,10 +22,9 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Url;
 
@@ -32,14 +34,12 @@ class Extension extends Page implements HasActions, HasTable
 
     protected string $view = 'admin.pages.extension';
 
-    // Cluster
     protected static ?string $cluster = Extensions::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'ri-download-2-line';
 
     protected static string|\BackedEnum|null $activeNavigationIcon = 'ri-download-2-fill';
 
-    // Label for the navigation item
     protected static ?string $navigationLabel = 'Available Extensions';
 
     #[Url(except: 'marketplace', as: 'tab')]
@@ -55,31 +55,12 @@ class Extension extends Page implements HasActions, HasTable
 
     public int $loadedItems = self::PER_PAGE;
 
-    public ?array $allExtensions = [];
-
     public ?string $error = null;
 
     public function mount(): void
     {
-        try {
-            $this->allExtensions = Cache::remember('paymenter_marketplace_extensions', now()->addHours(6), function () {
-                $response = Http::timeout(15)
-                    ->withUserAgent('Paymenter/' . config('app.version') . ' (https://paymenter.org)')
-                    ->get('https://api.paymenter.org/extensions', ['limit' => 999]);
-                if (!$response->successful()) {
-                    logger()->error('Paymenter Marketplace API request failed', ['status' => $response->status(), 'body' => $response->body()]);
-
-                    return null;
-                }
-
-                return $response->json('extensions', []);
-            });
-            if (is_null($this->allExtensions)) {
-                $this->error = 'The Paymenter Marketplace is currently unavailable. Please try again later.';
-            }
-        } catch (ConnectionException $e) {
-            $this->error = 'Failed to connect to the Paymenter Marketplace. Please check your server\'s internet connection.';
-            logger()->error('Paymenter Marketplace API connection failed: ' . $e->getMessage());
+        if (!config('settings.marketplace_url')) {
+            $this->error = 'No marketplace is configured. Set the Marketplace Manifest URL in Settings to start syncing extensions.';
         }
     }
 
@@ -103,15 +84,38 @@ class Extension extends Page implements HasActions, HasTable
         $this->loadedItems = self::PER_PAGE;
     }
 
+    public function getAllExtensionsProperty(): Collection
+    {
+        return MarketplaceListing::query()
+            ->whereIn('type', ['gateway', 'server', 'other'])
+            ->orderBy('name')
+            ->get()
+            ->map(function (MarketplaceListing $row) {
+                return [
+                    'id' => $row->id,
+                    'name' => $row->name,
+                    'type' => $row->type,
+                    'meta' => [
+                        'name' => $row->raw_meta['meta']['name'] ?? $row->name,
+                        'author' => $row->author,
+                        'description' => $row->description,
+                        'version' => $row->version,
+                        'icon' => $row->icon,
+                    ],
+                    'download_url' => $row->download_url,
+                    'sha256' => $row->sha256,
+                    'signature' => $row->signature,
+                    'has_migrations' => $row->has_migrations,
+                ];
+            });
+    }
+
     public function getFilteredExtensionsProperty(): Collection
     {
-        if (is_null($this->allExtensions)) {
-            return collect();
-        }
-
-        return collect($this->allExtensions)
-            ->when($this->search, fn (Collection $c) => $c->filter(fn ($i) => stripos($i['name'], $this->search) !== false))
-            ->when($this->filter !== 'all', fn (Collection $c) => $c->where('type', $this->filter));
+        return $this->allExtensions
+            ->when($this->search, fn (Collection $c) => $c->filter(fn ($i) => stripos($i['meta']['name'] ?? $i['name'], $this->search) !== false))
+            ->when($this->filter !== 'all', fn (Collection $c) => $c->where('type', $this->filter))
+            ->values();
     }
 
     public function getCanLoadMoreProperty(): bool
@@ -122,6 +126,90 @@ class Extension extends Page implements HasActions, HasTable
     public function getExtensionsProperty(): Collection
     {
         return $this->filteredExtensions->take($this->loadedItems);
+    }
+
+    public function downloadAndInstall(int $listingId): void
+    {
+        $listing = MarketplaceListing::find($listingId);
+        if (!$listing) {
+            Notification::make()->title('Listing not found')->danger()->send();
+
+            return;
+        }
+
+        try {
+            $zipPath = $this->downloadVerified($listing);
+
+            $service = app(UploadExtensionService::class);
+            $type = $service->handle($zipPath, $listing->sha256, $listing->signature, $listing->download_url);
+
+            Notification::make()
+                ->title('Extension installed')
+                ->body($this->postInstallMessage($type))
+                ->success()
+                ->send();
+        } catch (\Throwable $e) {
+            Notification::make()
+                ->title('Failed to install extension')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    private function downloadVerified(MarketplaceListing $listing): string
+    {
+        if (config('settings.marketplace_require_signature', true)) {
+            if (empty($listing->signature)) {
+                throw new \Exception('This package is unsigned and the marketplace requires signed packages.');
+            }
+            $key = config('settings.marketplace_signing_key');
+            if (empty($key)) {
+                throw new \Exception('No marketplace_signing_key is configured.');
+            }
+            if (!hash_equals($listing->signature, hash_hmac('sha256', $listing->sha256, $key))) {
+                throw new \Exception('Signature verification failed for this package.');
+            }
+        }
+
+        $cacheDir = storage_path('app/marketplace-cache');
+        if (!is_dir($cacheDir)) {
+            File::makeDirectory($cacheDir, 0755, true);
+        }
+        $zipPath = $cacheDir . '/' . $listing->sha256 . '.zip';
+
+        if (!file_exists($zipPath) || hash_file('sha256', $zipPath) !== $listing->sha256) {
+            $response = Http::timeout(60)
+                ->withUserAgent('Paymenter/' . config('app.version') . ' (marketplace-download)')
+                ->get($listing->download_url);
+
+            if (!$response->successful()) {
+                throw new \Exception('Failed to download package (HTTP ' . $response->status() . ').');
+            }
+
+            file_put_contents($zipPath, $response->body());
+        }
+
+        if (hash_file('sha256', $zipPath) !== $listing->sha256) {
+            File::delete($zipPath);
+            throw new \Exception('Downloaded package hash does not match the manifest.');
+        }
+
+        // Move into a unique path so UploadExtensionService can delete it without
+        // racing other concurrent installs.
+        $stagedPath = $cacheDir . '/staged-' . uniqid() . '.zip';
+        File::copy($zipPath, $stagedPath);
+
+        return $stagedPath;
+    }
+
+    private function postInstallMessage(string $type): string
+    {
+        return match ($type) {
+            'server' => 'Server extension installed. Visit the Servers page to configure it.',
+            'gateway' => 'Gateway extension installed. Visit the Gateways page to configure it.',
+            default => 'Extension installed. It is now available on the Installed tab.',
+        };
     }
 
     public function table(Table $table): Table
@@ -168,6 +256,7 @@ class Extension extends Page implements HasActions, HasTable
                 Action::make('upload')
                     ->label('Upload Extension')
                     ->icon('ri-upload-2-line')
+                    ->visible(fn () => Auth::user()?->hasPermission('admin.extensions.upload'))
                     ->form([
                         FileUpload::make('file')
                             ->label('Extension File')
@@ -175,12 +264,22 @@ class Extension extends Page implements HasActions, HasTable
                             ->acceptedFileTypes(['application/zip', 'application/x-zip-compressed'])
                             ->directory('extensions/uploaded')
                             ->preserveFilenames()
-                            ->maxSize(10240), // 10 MB
+                            ->maxSize(10240),
+                        TextInput::make('expected_sha256')
+                            ->label('Expected SHA-256 (optional)')
+                            ->helperText('If provided, the upload will be rejected unless its hash matches.')
+                            ->regex('/^[a-f0-9]{64}$/i'),
+                        TextInput::make('expected_signature')
+                            ->label('Expected Signature (optional)')
+                            ->helperText('HMAC-SHA256 over the SHA-256, base64 or hex. Only used when a marketplace signing key is configured.'),
                     ])
                     ->action(function (array $data, UploadExtensionService $service) {
                         try {
-                            $type = $service->handle(storage_path('app/' . $data['file']));
-                            // Handle the exception, e.g., log it or show an error message
+                            $type = $service->handle(
+                                storage_path('app/' . $data['file']),
+                                $data['expected_sha256'] ?: null,
+                                $data['expected_signature'] ?: null,
+                            );
                             switch ($type) {
                                 case 'server':
                                     Notification::make()
@@ -197,7 +296,6 @@ class Extension extends Page implements HasActions, HasTable
                                         ->send();
                                     break;
                                 default:
-                                    // Unknown type, just stay on the page
                                     Notification::make()
                                         ->title('Extension uploaded successfully')
                                         ->body('It should now be available on the "Ready to Install" tab.')
@@ -211,6 +309,18 @@ class Extension extends Page implements HasActions, HasTable
                                 ->body($e->getMessage())
                                 ->danger()
                                 ->send();
+                        }
+                    }),
+                Action::make('resync')
+                    ->label('Resync Marketplace')
+                    ->icon('ri-refresh-line')
+                    ->visible(fn () => Auth::user()?->hasPermission('admin.marketplace.sync'))
+                    ->action(function () {
+                        try {
+                            (new SyncMarketplaceJob)->handle();
+                            Notification::make()->title('Marketplace synced')->success()->send();
+                        } catch (\Throwable $e) {
+                            Notification::make()->title('Sync failed')->body($e->getMessage())->danger()->send();
                         }
                     }),
             ]);

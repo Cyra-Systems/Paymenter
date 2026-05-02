@@ -8,6 +8,7 @@ use App\Classes\Extension\Gateway;
 use App\Classes\Extension\Server;
 use App\Console\Commands\Extension\Install;
 use App\Console\Commands\Extension\Upgrade;
+use App\Models\Extension as ExtensionModel;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use ReflectionClass;
@@ -16,11 +17,12 @@ class UploadExtensionService
 {
     /**
      * Handle the uploaded extension file.
-     * The added file is always a zip file.
      *
-     * @return void
+     * If $expectedSha256 is provided, the file's hash is verified before extraction.
+     * If $expectedSignature and a marketplace_signing_key are provided, the HMAC is verified.
+     * On success, the verified hash/signature/source are persisted to the Extension row.
      */
-    public function handle(string $filePath): string
+    public function handle(string $filePath, ?string $expectedSha256 = null, ?string $expectedSignature = null, ?string $sourceUrl = null): string
     {
         // Validate the file type and size
         if (!file_exists($filePath) || !is_readable($filePath)) {
@@ -28,6 +30,25 @@ class UploadExtensionService
         }
         if (pathinfo($filePath, PATHINFO_EXTENSION) !== 'zip') {
             throw new \Exception('Invalid file type. Only zip files are allowed.');
+        }
+
+        $actualSha256 = hash_file('sha256', $filePath);
+        if ($expectedSha256 !== null && !hash_equals(strtolower($expectedSha256), $actualSha256)) {
+            File::delete($filePath);
+            throw new \Exception('Checksum mismatch. Expected ' . $expectedSha256 . ', got ' . $actualSha256 . '.');
+        }
+
+        if ($expectedSignature !== null) {
+            $key = config('settings.marketplace_signing_key');
+            if (empty($key)) {
+                File::delete($filePath);
+                throw new \Exception('A signature was provided but no marketplace_signing_key is configured.');
+            }
+            $computed = hash_hmac('sha256', $actualSha256, $key);
+            if (!hash_equals($expectedSignature, $computed)) {
+                File::delete($filePath);
+                throw new \Exception('Signature verification failed.');
+            }
         }
 
         // Extract the zip file
@@ -99,7 +120,37 @@ class UploadExtensionService
             ]);
         }
 
+        $this->persistProvenance($type, $actualSha256, $expectedSignature, $sourceUrl);
+
         return $type['type'];
+    }
+
+    private function persistProvenance(array $type, string $sha256, ?string $signature, ?string $sourceUrl): void
+    {
+        $extension = ExtensionModel::where('type', $type['type'])
+            ->where('extension', $type['class'])
+            ->first();
+
+        if (!$extension) {
+            return;
+        }
+
+        $extensionClass = 'Paymenter\\Extensions\\' . ucfirst($type['type']) . 's\\' . ucfirst($type['class']);
+        $installedVersion = null;
+        if (class_exists($extensionClass)) {
+            $reflection = new ReflectionClass($extensionClass);
+            $attributes = $reflection->getAttributes(ExtensionMeta::class);
+            if (count($attributes) > 0) {
+                $installedVersion = $attributes[0]->newInstance()->version;
+            }
+        }
+
+        $extension->update([
+            'sha256' => $sha256,
+            'signature' => $signature,
+            'source_url' => $sourceUrl,
+            'installed_version' => $installedVersion,
+        ]);
     }
 
     private function getExtensionType(string $path): array

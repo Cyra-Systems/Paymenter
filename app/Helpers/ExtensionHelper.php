@@ -715,4 +715,29 @@ class ExtensionHelper
             report($e);
         }
     }
+
+    /**
+     * Run migrations for a specific extension and return a structured result.
+     * Used by the admin "Run Database Migrations" button.
+     */
+    public static function runMigrationsWithResult($path): array
+    {
+        $migrator = app(Migrator::class);
+
+        try {
+            $ran = $migrator->run(base_path($path));
+
+            return [
+                'ok' => true,
+                'ran' => $ran,
+                'error' => null,
+            ];
+        } catch (Exception $e) {
+            return [
+                'ok' => false,
+                'ran' => [],
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
 }

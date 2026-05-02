@@ -18,6 +18,10 @@ class Extension extends Model implements Auditable
         // Name of extension class (e.g. 'Stripe' or 'Paypal')
         'extension',
         'type',
+        'sha256',
+        'signature',
+        'source_url',
+        'installed_version',
     ];
 
     protected $guarded = [];

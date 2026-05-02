@@ -150,7 +150,28 @@ return [
                 'update' => 'Update Extensions',
                 'viewAny' => 'View Extensions',
                 'install' => 'Install Extensions',
+                'upload' => 'Upload Extensions (Trusted Publisher)',
+                'migrate' => 'Run Extension Migrations',
                 'delete' => 'Delete Extensions',
+            ],
+            'themes' => [
+                'viewAny' => 'View Themes',
+                'install' => 'Install Themes',
+                'upload' => 'Upload Themes (Trusted Publisher)',
+                'build' => 'Run Theme Build',
+                'delete' => 'Delete Themes',
+            ],
+            'marketplace' => [
+                'viewAny' => 'View Marketplace',
+                'sync' => 'Sync Marketplace',
+                'manage' => 'Manage Marketplace Settings',
+            ],
+            'backups' => [
+                'viewAny' => 'View Backups',
+                'create' => 'Create Backups',
+                'restore' => 'Restore Backups',
+                'delete' => 'Delete Backups',
+                'download' => 'Download Backups',
             ],
             'failed_jobs' => [
                 'viewAny' => 'View Failed Jobs',

@@ -2,6 +2,7 @@
 
 namespace App\Admin\Resources\GatewayResource\Pages;
 
+use App\Admin\Concerns\HasMigrateExtensionAction;
 use App\Admin\Resources\GatewayResource;
 use App\Helpers\ExtensionHelper;
 use Filament\Actions\DeleteAction;
@@ -11,11 +12,14 @@ use Illuminate\Support\Arr;
 
 class EditGateway extends EditRecord
 {
+    use HasMigrateExtensionAction;
+
     protected static string $resource = GatewayResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
+            $this->migrateExtensionAction(),
             DeleteAction::make()->before(fn ($record) => ExtensionHelper::call($record, 'disabled', [$record], mayFail: true)),
         ];
     }
