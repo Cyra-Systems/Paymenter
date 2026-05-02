@@ -7,17 +7,18 @@ use App\Livewire\Component as BaseComponent;
 use App\Models\Service;
 use Paymenter\Extensions\Servers\Pelican\Pelican;
 
-class Component extends BaseComponent
+abstract class Component extends BaseComponent
 {
     public Service $service;
 
+    /**
+     * Mounted via `<livewire:pelican.* :service="$service" />` from the
+     * Service Show tab renderer. The parent page already enforces
+     * `can:view,service` so we only re-check the extension binding.
+     */
     public function mount(Service $service): void
     {
         $this->service = $service->load('product.server');
-
-        if ($service->user_id !== auth()->id()) {
-            abort(403);
-        }
 
         if (optional($this->service->product->server)->extension !== 'Pelican') {
             abort(404);
@@ -39,5 +40,31 @@ class Component extends BaseComponent
     {
         $props = ExtensionHelper::getServiceProperties($this->service);
         return (int) ($props['selected_egg'] ?? 0);
+    }
+
+    /**
+     * Resolves the Pelican panel server attributes (id, uuid, identifier, …) for
+     * this service's currently-selected egg. Returns null if not provisioned yet.
+     */
+    protected function panelServer(): ?array
+    {
+        $eggId = $this->eggId();
+        if ($eggId <= 0) return null;
+
+        try {
+            $s = $this->pelican()->getServer($this->service->id, $eggId, false);
+            return $s === false ? null : $s;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Aborts 403 if the named visibility toggle is not enabled in product settings.
+     */
+    protected function requireToggle(string $key): void
+    {
+        $settings = $this->productSettings();
+        if (empty($settings[$key])) abort(403);
     }
 }

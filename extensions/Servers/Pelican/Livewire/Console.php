@@ -10,39 +10,20 @@ class Console extends Component
     public ?array $panelServer     = null;
     public ?array $serverResources = null;
     public bool   $fastPolling     = false;
+    public string $command         = '';
 
     public function mount(Service $service): void
     {
         parent::mount($service);
+        $this->requireToggle('show_console');
 
-        $settings = $this->productSettings();
-        if (empty($settings['show_console'])) {
-            abort(403);
-        }
-
-        $this->loadServer();
+        $this->panelServer = $this->panelServer();
         $this->loadResources();
-    }
-
-    protected function loadServer(): void
-    {
-        $eggId = $this->eggId();
-        if ($eggId <= 0) {
-            return;
-        }
-
-        try {
-            $this->panelServer = $this->pelican()->getServer($this->service->id, $eggId);
-        } catch (Exception $e) {
-            $this->panelServer = null;
-        }
     }
 
     protected function loadResources(): void
     {
-        if (! $this->panelServer) {
-            return;
-        }
+        if (! $this->panelServer) return;
 
         try {
             $oldState              = $this->serverResources['current_state'] ?? null;
@@ -62,9 +43,7 @@ class Console extends Component
 
     public function power(string $signal): void
     {
-        if (! $this->panelServer) {
-            return;
-        }
+        if (! $this->panelServer) return;
 
         if (! in_array($signal, ['start', 'stop', 'restart', 'kill'], true)) {
             $this->notify('Invalid power signal.', 'error');
@@ -73,38 +52,37 @@ class Console extends Component
 
         try {
             $this->pelican()->powerServer($this->panelServer['uuid'], $signal);
-            $this->notify('Power signal sent.', 'success');
+            $this->notify('Power signal sent: ' . $signal, 'success');
             $this->fastPolling = true;
         } catch (Exception $e) {
-            $this->notify('Failed: ' . $e->getMessage(), 'error');
+            $this->notify($e->getMessage(), 'error');
         }
     }
 
-    public function reinstall(): void
+    public function send(): void
     {
         $settings = $this->productSettings();
-
-        if (empty($settings['show_reinstall'])) {
-            $this->notify('Reinstall is not allowed for this plan.', 'error');
+        if (empty($settings['show_send_command'])) {
+            $this->notify('Sending commands is not allowed for this plan.', 'error');
             return;
         }
 
-        if (! $this->panelServer) {
-            return;
-        }
+        $cmd = trim($this->command);
+        if ($cmd === '' || ! $this->panelServer) return;
 
         try {
-            $this->pelican()->reinstallPanelServer($this->panelServer['id']);
-            $this->notify('Reinstall initiated.', 'success');
+            $this->pelican()->sendCommand($this->panelServer['uuid'], $cmd);
+            $this->notify('Command sent.', 'success');
+            $this->command = '';
         } catch (Exception $e) {
-            $this->notify('Failed: ' . $e->getMessage(), 'error');
+            $this->notify($e->getMessage(), 'error');
         }
     }
 
     public function render()
     {
-        return view('pelican::console', [
+        return view('pelican::tabs.console', [
             'settings' => $this->productSettings(),
-        ])->layoutData(['sidebar' => true]);
+        ]);
     }
 }

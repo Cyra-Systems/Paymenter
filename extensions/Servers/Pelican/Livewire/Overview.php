@@ -21,23 +21,12 @@ class Overview extends Component
 
     protected function loadServer(): void
     {
-        $eggId = $this->eggId();
-        if ($eggId <= 0) {
-            return;
-        }
-
-        try {
-            $this->panelServer = $this->pelican()->getServer($this->service->id, $eggId);
-        } catch (Exception $e) {
-            $this->panelServer = null;
-        }
+        $this->panelServer = $this->panelServer();
     }
 
     protected function loadResources(): void
     {
-        if (! $this->panelServer) {
-            return;
-        }
+        if (! $this->panelServer) return;
 
         try {
             $oldState              = $this->serverResources['current_state'] ?? null;
@@ -60,8 +49,7 @@ class Overview extends Component
 
     public function render()
     {
-        $eggId    = $this->eggId();
-        $settings = $this->productSettings();
+        $eggId     = $this->eggId();
         $subdomain = null;
         $alloc     = null;
         $eggName   = null;
@@ -78,7 +66,6 @@ class Overview extends Component
             }
         }
 
-        return view('pelican::overview', compact('settings', 'subdomain', 'alloc', 'eggName'))
-            ->layoutData(['sidebar' => true]);
+        return view('pelican::tabs.overview', compact('subdomain', 'alloc', 'eggName'));
     }
 }
