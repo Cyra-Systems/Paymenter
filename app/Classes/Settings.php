@@ -137,18 +137,19 @@ class Settings
                         'hcaptcha' => 'hCaptcha',
                     ],
                     'default' => 'disabled',
+                    'live' => true,
                 ],
                 [
                     'name' => 'captcha_site_key',
                     'label' => 'Captcha Site Key',
                     'type' => 'text',
-                    'required' => false,
+                    'required' => fn (Get $get) => $get('captcha') && $get('captcha') !== 'disabled',
                 ],
                 [
                     'name' => 'captcha_secret',
                     'label' => 'Captcha Secret',
                     'type' => 'text',
-                    'required' => false,
+                    'required' => fn (Get $get) => $get('captcha') && $get('captcha') !== 'disabled',
                 ],
 
                 [

@@ -83,7 +83,7 @@ class NotificationTemplateResource extends Resource
                     ->schema([
                         TextInput::make('in_app_title')
                             ->label('In-App Title')
-                            ->required()
+                            ->required(fn (Get $get) => $get('in_app_enabled') !== NotificationEnabledStatus::Never->value)
                             ->disabled(fn (Get $get) => $get('in_app_enabled') === NotificationEnabledStatus::Never->value)
                             ->maxLength(255),
                         Select::make('in_app_enabled')
@@ -98,7 +98,7 @@ class NotificationTemplateResource extends Resource
                             ->required(),
                         TextInput::make('in_app_body')
                             ->label('In-App Body')
-                            ->required()
+                            ->required(fn (Get $get) => $get('in_app_enabled') !== NotificationEnabledStatus::Never->value)
                             ->disabled(fn (Get $get) => $get('in_app_enabled') === NotificationEnabledStatus::Never->value)
                             ->columnSpanFull(),
                         TextInput::make('in_app_url')
