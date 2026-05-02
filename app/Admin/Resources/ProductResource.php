@@ -8,18 +8,21 @@ use App\Admin\Resources\ProductResource\Pages\ListProducts;
 use App\Classes\FilamentInput;
 use App\Helpers\ExtensionHelper;
 use App\Models\Currency;
+use App\Models\Domain;
 use App\Models\Product;
 use App\Models\Server;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -108,7 +111,6 @@ class ProductResource extends Resource
 
                         Tab::make('Upgrades')
                             ->schema([
-                                // Select input for the products this product can upgrade to (hasmany relationship)
                                 Select::make('upgrades')
                                     ->label('Upgrades')
                                     ->relationship('upgrades', 'name', ignoreRecord: true)
@@ -150,7 +152,6 @@ class ProductResource extends Resource
 
                                             try {
                                                 foreach (ExtensionHelper::getProductConfigOnce(Server::findOrFail($server), $get('settings')) as $setting) {
-                                                    // Easier to use dot notation for settings
                                                     $setting['name'] = 'settings.' . $setting['name'];
                                                     $settings[] = FilamentInput::convert($setting);
                                                 }
@@ -162,6 +163,40 @@ class ProductResource extends Resource
                                         }
                                     ),
 
+                            ]),
+
+                        Tab::make('Domain')
+                            ->columns(2)
+                            ->schema([
+                                Toggle::make('domain_enabled')
+                                    ->label('Enable domain on this product')
+                                    ->helperText('When enabled, customers will be prompted to choose / supply a domain at checkout.')
+                                    ->live()
+                                    ->columnSpanFull(),
+                                Toggle::make('domain_required')
+                                    ->label('Domain is required')
+                                    ->visible(fn (Get $get) => (bool) $get('domain_enabled')),
+                                CheckboxList::make('domain_options')
+                                    ->label('Allowed domain actions')
+                                    ->options([
+                                        'register' => 'Register a new domain (via Enom)',
+                                        'transfer' => 'Transfer an existing domain in (via Enom)',
+                                        'custom' => 'Use a custom domain I already own (external)',
+                                        'subdomain' => 'Use a subdomain of one of my domains',
+                                        'forward' => 'Forward the domain to a URL',
+                                    ])
+                                    ->columns(1)
+                                    ->columnSpanFull()
+                                    ->visible(fn (Get $get) => (bool) $get('domain_enabled')),
+                                Select::make('domain_parent_id')
+                                    ->label('Parent domain (for subdomain option)')
+                                    ->options(fn () => Domain::query()
+                                        ->where('type', '!=', Domain::TYPE_SUBDOMAIN)
+                                        ->pluck('domain', 'id'))
+                                    ->searchable()
+                                    ->columnSpanFull()
+                                    ->visible(fn (Get $get) => (bool) $get('domain_enabled')
+                                        && in_array('subdomain', (array) $get('domain_options'))),
                             ]),
                     ]),
             ])->columns(1);
@@ -272,7 +307,6 @@ class ProductResource extends Resource
                         TextInput::make('price')
                             ->required()
                             ->label('Price')
-                            // Suffix based on chosen currency
                             ->prefix(fn (Get $get) => Currency::where('code', $get('currency_code'))->first()?->prefix)
                             ->suffix(fn (Get $get) => Currency::where('code', $get('currency_code'))->first()?->suffix)
                             ->live(onBlur: true)
