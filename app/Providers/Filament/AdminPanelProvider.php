@@ -101,6 +101,10 @@ class AdminPanelProvider extends PanelProvider
                 fn (): string => Blade::render('<x-admin-footer />'),
             )
             ->renderHook(
+                'panels::head.start',
+                fn (): string => '<script>document.documentElement.classList.add("dark");try{localStorage.setItem("theme","dark");}catch(e){}</script>',
+            )
+            ->renderHook(
                 'panels::head.end',
                 function (): string {
                     $activeTheme = config('settings.theme', 'default');

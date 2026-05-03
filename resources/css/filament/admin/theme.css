@@ -8,8 +8,7 @@
 /* ----------------------------------------------------------------------------
    Theme integration — variables come from the active theme's
    views/layouts/colors.blade.php (injected by AdminPanelProvider via the
-   panels::head.end render hook). Falls back gracefully when a variable is
-   not declared by older themes.
+   panels::head.end render hook).
 ---------------------------------------------------------------------------- */
 
 .fi-wi-stats-overview-stat.success .fi-wi-stats-overview-stat-value {
@@ -20,60 +19,212 @@
     color: theme('colors.red.500');
 }
 
-/* Surfaces */
-.fi-topbar,
-.fi-sidebar,
-.fi-contained,
-.fi-ta-ctn,
-.fi-wi-stats-overview-stat,
-.fi-section-has-header,
-.fi-widget-wrapper,
-.fi-tabs,
-.fi-modal-window,
-.fi-dropdown-panel {
-    background-color: hsl(var(--color-background-secondary));
-    border-color: hsl(var(--color-base) / var(--glass-border-opacity, 0.12));
-}
+/* ----------------------------------------------------------------------------
+   Page background — radial purple/magenta gradients on a dark base
+---------------------------------------------------------------------------- */
 
 .fi-body,
 .fi-simple-main {
     background-color: hsl(var(--color-background));
     background-image:
-        radial-gradient(ellipse 80% 60% at 15% 0%, hsl(var(--gradient-from, var(--color-primary)) / 0.25), transparent 60%),
-        radial-gradient(ellipse 70% 50% at 100% 100%, hsl(var(--gradient-via, var(--color-secondary)) / 0.20), transparent 60%);
+        radial-gradient(ellipse 80% 60% at 15% 0%, hsl(var(--gradient-from, var(--color-primary)) / 0.30), transparent 60%),
+        radial-gradient(ellipse 70% 50% at 100% 100%, hsl(var(--gradient-via, var(--color-secondary)) / 0.25), transparent 60%);
     background-attachment: fixed;
+    color: hsl(var(--color-base));
 }
 
-/* Brand-colored accents on primary actions, links, focus rings */
-.fi-btn-color-primary {
+/* ----------------------------------------------------------------------------
+   Glass surfaces — every card / panel / section gets translucency,
+   backdrop-blur, a thin highlighted border, and a layered shadow for depth.
+   Uses !important sparingly so Filament's class-based defaults can be
+   overridden without targeting deep child selectors.
+---------------------------------------------------------------------------- */
+
+.fi-topbar,
+.fi-sidebar {
+    background-color: hsl(var(--color-background-secondary) / 0.45) !important;
+    backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
+    border-color: hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
+    box-shadow: 0 1px 0 hsl(var(--color-base) / 0.04) inset;
+}
+
+.fi-section,
+.fi-section-has-header,
+.fi-modal-window,
+.fi-ta-ctn,
+.fi-wi-stats-overview-stat,
+.fi-widget-wrapper,
+.fi-dropdown-panel,
+.fi-fo-component-ctn,
+.fi-form,
+.fi-fo-form,
+.fi-fo-builder-block,
+.fi-fo-builder-item,
+.fi-fo-repeater-item {
+    background-color: hsl(var(--color-background-secondary) / 0.45) !important;
+    backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
+    border: 1px solid hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
+    border-radius: var(--radius-lg, 0.75rem) !important;
+    box-shadow:
+        0 1px 0 hsl(var(--color-base) / 0.06) inset,
+        0 1px 3px hsl(0 0% 0% / 0.25),
+        0 12px 32px -12px hsl(0 0% 0% / 0.35);
+}
+
+/* Tabs container — no double-border, just inherit the parent card's glass */
+.fi-tabs {
+    background-color: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+/* Settings page wrapper — round the form that holds tabs */
+.fi-page form,
+form.fi-fo-component-ctn,
+.fi-fo-component-ctn:has(> .fi-tabs),
+.fi-page > div > form {
+    border-radius: var(--radius-lg, 0.75rem) !important;
+    overflow: hidden;
+}
+
+/* ----------------------------------------------------------------------------
+   Buttons
+---------------------------------------------------------------------------- */
+
+/* Primary — magenta gradient + glow */
+.fi-btn-color-primary,
+button.fi-btn-color-primary,
+a.fi-btn-color-primary {
+    background-color: transparent !important;
     background-image: linear-gradient(var(--gradient-angle, 135deg),
         hsl(var(--color-primary)) 0%, hsl(var(--color-accent, var(--color-primary))) 100%) !important;
     color: white !important;
     box-shadow:
-        0 0 24px -4px hsl(var(--glow-color, var(--color-primary)) / 0.45),
-        0 0 60px -10px hsl(var(--glow-color, var(--color-primary)) / 0.25);
+        0 0 24px -4px hsl(var(--glow-color, var(--color-primary)) / 0.50),
+        0 0 60px -10px hsl(var(--glow-color, var(--color-primary)) / 0.30),
+        0 1px 0 hsl(var(--color-base) / 0.15) inset !important;
     border: none !important;
 }
 
 .fi-btn-color-primary:hover {
-    filter: brightness(1.1);
+    filter: brightness(1.12);
 }
 
-.fi-link,
-a.fi-link {
-    color: hsl(var(--color-primary));
+/* Secondary / gray / outlined — translucent glass */
+.fi-btn-color-gray,
+.fi-btn-color-secondary,
+button.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning),
+a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning),
+.fi-icon-btn {
+    background-color: hsl(var(--color-background-secondary) / 0.55) !important;
+    backdrop-filter: blur(var(--glass-blur, 14px));
+    -webkit-backdrop-filter: blur(var(--glass-blur, 14px));
+    border: 1px solid hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
+    color: hsl(var(--color-base)) !important;
+    box-shadow:
+        0 1px 0 hsl(var(--color-base) / 0.06) inset,
+        0 1px 2px hsl(0 0% 0% / 0.2);
+}
+
+.fi-btn-color-gray:hover,
+.fi-btn-color-secondary:hover,
+button.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):hover,
+a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):hover {
+    background-color: hsl(var(--color-background-secondary) / 0.75) !important;
+}
+
+/* ----------------------------------------------------------------------------
+   Form inputs — translucent glass with primary focus ring
+---------------------------------------------------------------------------- */
+
+.fi-input,
+.fi-select-input,
+.fi-textarea,
+.fi-input-wrp {
+    background-color: hsl(var(--color-background) / 0.4) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-color: hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
+    color: hsl(var(--color-base)) !important;
 }
 
 .fi-input:focus,
 .fi-select-input:focus,
 .fi-textarea:focus,
 [type='checkbox']:focus,
-[type='radio']:focus {
+[type='radio']:focus,
+.fi-input-wrp:focus-within {
     --tw-ring-color: hsl(var(--color-primary)) !important;
     border-color: hsl(var(--color-primary)) !important;
 }
 
-/* Text tones */
+/* Toggles + checkbox active states */
+[type='checkbox']:checked,
+[type='radio']:checked,
+.fi-toggle-on,
+.fi-toggle[aria-checked='true'] {
+    background-color: hsl(var(--color-primary)) !important;
+    border-color: hsl(var(--color-primary)) !important;
+    background-image: none !important;
+}
+
+/* Sidebar active item — magenta tint */
+.fi-sidebar-item-active > .fi-sidebar-item-button,
+.fi-sidebar-item-active .fi-sidebar-item-button {
+    background-color: hsl(var(--color-primary) / 0.18) !important;
+    color: hsl(var(--color-primary)) !important;
+}
+
+.fi-sidebar-item-active .fi-sidebar-item-icon {
+    color: hsl(var(--color-primary)) !important;
+}
+
+/* Tabs active state */
+.fi-tabs-tab[aria-selected='true'],
+.fi-tabs-tab.fi-active {
+    color: hsl(var(--color-primary)) !important;
+    border-color: hsl(var(--color-primary)) !important;
+}
+
+/* Links + hint actions */
+.fi-link,
+a.fi-link,
+.fi-color-primary,
+.fi-fo-field-wrp-hint a,
+.fi-fo-field-wrp-hint button,
+.fi-hint a,
+.fi-hint button {
+    color: hsl(var(--color-primary)) !important;
+}
+
+/* Badges */
+.fi-badge-color-primary {
+    background-color: hsl(var(--color-primary) / 0.15) !important;
+    color: hsl(var(--color-primary)) !important;
+    border-color: hsl(var(--color-primary) / 0.3) !important;
+}
+
+/* ----------------------------------------------------------------------------
+   Hide Filament's dark/light theme switcher — calaentar admin is dark only
+---------------------------------------------------------------------------- */
+
+.fi-theme-switcher,
+.fi-user-menu-theme-switcher,
+[x-data*="themeSwitcher" i],
+button[aria-label*="theme" i],
+.fi-dropdown-list-item:has(> button[aria-label*="dark" i]),
+.fi-dropdown-list-item:has(> button[aria-label*="light" i]),
+.fi-dropdown-list-item:has(> button[aria-label*="system" i]) {
+    display: none !important;
+}
+
+/* ----------------------------------------------------------------------------
+   Text tones
+---------------------------------------------------------------------------- */
+
 .fi-body,
 .fi-sidebar-item-label,
 .fi-section-content {
@@ -86,7 +237,10 @@ a.fi-link {
     color: hsl(var(--color-muted));
 }
 
-/* Border radius scale — accept any CSS value the theme author sets */
+/* ----------------------------------------------------------------------------
+   Border-radius scale
+---------------------------------------------------------------------------- */
+
 .fi-btn,
 .fi-input,
 .fi-select-input,
@@ -95,32 +249,6 @@ a.fi-link {
 .fi-tabs-tab,
 .fi-dropdown-list-item {
     border-radius: var(--radius-md, 0.5rem);
-}
-
-.fi-section,
-.fi-modal-window,
-.fi-ta-ctn,
-.fi-wi-stats-overview-stat,
-.fi-widget-wrapper,
-.fi-dropdown-panel,
-.fi-fo-component-ctn,
-.fi-form,
-.fi-fo-form,
-.fi-page-content > .fi-fo-component-ctn,
-.fi-page > div > form,
-.fi-tabs ~ div,
-[wire\:submit] {
-    border-radius: var(--radius-lg, 0.75rem);
-    overflow: hidden;
-}
-
-/* The Settings page tabs sit on top of a card wrapper — make sure the
-   wrapper itself has the radius so the corners aren't square. */
-.fi-page form,
-form.fi-fo-component-ctn,
-.fi-fo-component-ctn:has(> .fi-tabs) {
-    border-radius: var(--radius-lg, 0.75rem) !important;
-    overflow: hidden;
 }
 
 .fi-avatar,
