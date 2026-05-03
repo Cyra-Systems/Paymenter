@@ -102,8 +102,25 @@ a.fi-link {
 .fi-ta-ctn,
 .fi-wi-stats-overview-stat,
 .fi-widget-wrapper,
-.fi-dropdown-panel {
+.fi-dropdown-panel,
+.fi-fo-component-ctn,
+.fi-form,
+.fi-fo-form,
+.fi-page-content > .fi-fo-component-ctn,
+.fi-page > div > form,
+.fi-tabs ~ div,
+[wire\:submit] {
     border-radius: var(--radius-lg, 0.75rem);
+    overflow: hidden;
+}
+
+/* The Settings page tabs sit on top of a card wrapper — make sure the
+   wrapper itself has the radius so the corners aren't square. */
+.fi-page form,
+form.fi-fo-component-ctn,
+.fi-fo-component-ctn:has(> .fi-tabs) {
+    border-radius: var(--radius-lg, 0.75rem) !important;
+    overflow: hidden;
 }
 
 .fi-avatar,

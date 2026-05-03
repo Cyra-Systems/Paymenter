@@ -95,6 +95,29 @@ looks the same as it did with Tailwind CSS v3.
     }
 }
 
+/* ----------------------------------------------------------------------------
+   PageBuilder bridge — make the PageBuilder extension inherit the active
+   theme tokens instead of its own per-extension settings. PageBuilder emits a
+   <style>:root{--hpb-*}</style> block via the 'head' event hook AFTER this
+   file loads, so we use !important on the custom-property declarations to
+   beat the later (non-!important) inline overrides. Also covers .dark since
+   PageBuilder defines a separate dark-mode block.
+---------------------------------------------------------------------------- */
+:root,
+.dark {
+    --hpb-color-primary: var(--color-primary) !important;
+    --hpb-color-secondary: var(--color-secondary) !important;
+    --hpb-color-neutral: var(--color-neutral) !important;
+    --hpb-color-base: var(--color-base) !important;
+    --hpb-color-muted: var(--color-muted) !important;
+    --hpb-color-inverted: var(--color-inverted) !important;
+    --hpb-color-background: var(--color-background) !important;
+    --hpb-card-radius: var(--radius-lg) !important;
+    --hpb-card-shadow:
+        0 0 24px -4px hsl(var(--glow-color) / 0.35),
+        0 0 60px -10px hsl(var(--glow-color) / 0.2) !important;
+}
+
 @utility glass {
     background-color: hsl(var(--color-background-secondary) / var(--glass-opacity));
     border: 1px solid hsl(var(--color-base) / var(--glass-border-opacity));
