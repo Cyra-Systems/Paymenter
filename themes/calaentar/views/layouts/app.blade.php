@@ -36,9 +36,7 @@
     {!! hook('head') !!}
 </head>
 
-<body class="dark relative w-full bg-background text-base min-h-screen flex flex-col antialiased"
-    x-cloak
->
+<body class="dark relative w-full bg-background text-base min-h-screen flex flex-col antialiased">
     <div aria-hidden="true"
         class="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <div class="absolute -top-40 -left-40 size-[40rem] rounded-full opacity-60 blur-3xl animate-pulse-glow"

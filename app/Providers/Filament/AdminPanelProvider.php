@@ -43,7 +43,26 @@ class AdminPanelProvider extends PanelProvider
 
         Notifications::alignment(Alignment::Center);
 
-        $primaryHex = config('settings.theme_' . config('settings.theme', 'default') . '_admin_primary_hex');
+        $activeTheme = config('settings.theme', 'default');
+        $primaryHex = config("settings.theme_{$activeTheme}_admin_primary_hex");
+
+        if (!$primaryHex) {
+            $themeFile = base_path("themes/{$activeTheme}/theme.php");
+            if (File::exists($themeFile)) {
+                try {
+                    $themeData = require $themeFile;
+                    foreach ($themeData['settings'] ?? [] as $themeSetting) {
+                        if (($themeSetting['name'] ?? null) === 'admin_primary_hex') {
+                            $primaryHex = $themeSetting['default'] ?? null;
+                            break;
+                        }
+                    }
+                } catch (Exception $e) {
+                    // Theme file unreadable — fall through to default Color::Blue
+                }
+            }
+        }
+
         $primaryColor = $primaryHex && preg_match('/^#?[0-9a-fA-F]{6}$/', ltrim($primaryHex, '#'))
             ? Color::hex('#' . ltrim($primaryHex, '#'))
             : Color::Blue;

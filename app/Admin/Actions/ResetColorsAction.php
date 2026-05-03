@@ -6,6 +6,7 @@ use App\Classes\Settings as ClassesSettings;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 class ResetColorsAction extends Action
 {
@@ -18,30 +19,36 @@ class ResetColorsAction extends Action
     {
         parent::setUp();
 
-        $this->label('Reset Colors')
+        $this->label('Reset Theme')
             ->color('danger')
             ->requiresConfirmation()
             ->action(function () {
                 Gate::authorize('has-permission', 'admin.settings.update');
 
-                $colorSettings = [];
+                $resetSettings = [];
                 foreach (ClassesSettings::settings() as $settings) {
                     foreach ($settings as $setting) {
-                        if (($setting['type'] ?? '') === 'color') {
-                            $colorSettings[$setting['name']] = $setting['default'] ?? '';
+                        $type = $setting['type'] ?? '';
+                        $name = $setting['name'] ?? '';
+
+                        $isAppearance = $type === 'color'
+                            || Str::contains($name, ['radius-', '-radius', 'gradient-', 'glass-', 'glow-']);
+
+                        if ($isAppearance) {
+                            $resetSettings[$name] = $setting['default'] ?? '';
                         }
                     }
                 }
 
                 $livewire = $this->getLivewire();
                 $currentData = $livewire->form->getState();
-                foreach ($colorSettings as $key => $defaultValue) {
+                foreach ($resetSettings as $key => $defaultValue) {
                     $currentData[$key] = $defaultValue;
                 }
                 $livewire->form->fill($currentData);
 
                 Notification::make()
-                    ->title('Colors has been reset!')
+                    ->title('Theme appearance has been reset!')
                     ->success()
                     ->send();
             });
