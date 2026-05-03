@@ -1,5 +1,5 @@
 @if(session()->has('impersonating'))
-    <div class="fixed bottom-0 right-0 z-50 flex gap-2 justify-center items-center bg-background-secondary shadow-lg p-4 w-full border-t border-neutral">
+    <div class="fixed bottom-0 right-0 z-50 flex gap-2 justify-center items-center backdrop-blur-xl bg-background-secondary/85 shadow-2xl p-4 w-full border-t border-white/10">
         <p>
             {{ __('You are currently impersonating') }}: 
             <strong>{{  auth()->user()->name }}</strong>

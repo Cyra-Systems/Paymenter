@@ -7,7 +7,7 @@
             </h1>
             @endif
             @foreach (Cart::items() as $item)
-            <div class="flex flex-row justify-between w-full bg-background-secondary p-3 rounded-md border border-neutral">
+            <div class="flex flex-row justify-between w-full glass p-3 rounded-lg">
                 <div class="flex flex-col gap-1">
                     <h2 class="text-2xl font-semibold">
                         {{ $item->product->name }}
@@ -59,7 +59,7 @@
         </div>
         <div class="flex flex-col gap-4">
             @if (Cart::items()->count() > 0)
-            <div class="flex flex-col gap-2 w-full col-span-1 bg-background-secondary p-3 rounded-md border border-neutral">
+            <div class="flex flex-col gap-2 w-full col-span-1 glass p-3 rounded-lg">
                 <h2 class="text-2xl font-semibold mb-3">
                     {{ __('product.order_summary') }}
                 </h2>

@@ -150,6 +150,92 @@ Do NOT:
 
 ---
 
+## Modern block ideas (use as a menu)
+
+When the user asks for "a block" without specifying, offer one or two
+variations from this menu and ask which they want. Each entry lists what
+makes the variation modern in 2026 — pick patterns that ship today, not 2018.
+
+### Hero variations
+- **Centered headline + gradient text + ambient glow** — `gradient-text` on
+  the H1, `gradient-bg glow rounded-full` on the primary CTA, soft grid or
+  noise SVG behind, no hero image.
+- **Split hero** — Left: copy + CTA, Right: a glass card with a fake
+  product preview (rounded-xl, drop-shadow, an arrow + label badge in the
+  corner). Emphasize negative space.
+- **Marquee under hero** — Auto-scrolling row of partner / customer logos,
+  each in a glass chip with `mask-image` fade on the edges.
+- **Spotlight cursor** — `position: fixed` div with a radial gradient
+  following the mouse via Alpine `x-on:mousemove`.
+
+### Card / feature grid variations
+- **Bento grid** — Asymmetric grid (some cards span 2 cols, others 1 col)
+  with `grid-template-areas`. Each card is a `glass-card` with a unique
+  icon in a magenta gradient circle.
+- **Hover-reveal cards** — Card shows a title + icon by default. On
+  `:hover`, a description and CTA fade in via `opacity` + a subtle
+  `translate-y`. Use `transition` not Alpine.
+- **Tilted cards** — `transform: perspective(1000px) rotateY(...)` on
+  hover, using `pointer-events: auto` and `mouse-position` as a CSS
+  custom property.
+- **Animated border** — `::before` pseudo-element with a conic-gradient
+  that rotates via `@property` + `@keyframes`, masked to a 1px ring
+  around the card.
+
+### Pricing variations
+- **Three-tier with featured plan** — Middle plan is taller (`scale-105`)
+  with a magenta-gradient border ring (use a `padding: 1px;
+  background: gradient` wrapper trick). Recommended badge sits in the
+  top-right corner.
+- **Toggle for monthly / yearly** — Pill toggle at the top, prices
+  swap with `x-show` + `x-transition`. Yearly shows a "Save 20%" badge.
+- **Comparison table on mobile / cards on desktop** — Use
+  `@container` queries to swap layouts based on container width.
+
+### Form / CTA variations
+- **Glass sign-up bar** — Single-line form (email + submit) inside a
+  `glass-card` with the submit as a `gradient-bg glow rounded-full`
+  pill button.
+- **Inline CTA with stat counters** — Three big numbers (each one
+  animating up on intersection observer), with a CTA button below.
+- **Progressive disclosure** — Single CTA. On click, expands into a
+  full multi-field form (Alpine `x-show` + `x-collapse`).
+
+### Testimonials / social-proof variations
+- **Masonry grid of cards** — Different heights, each with a quote +
+  avatar (use the same dark-circle-with-initial pattern as the
+  navigation avatar).
+- **Carousel of large quotes** — One quote at a time, large pull-quote
+  styling, dots for navigation. Use Alpine `x-data="{i: 0}"`.
+- **Logo grid** — Just rows of partner logos in glass chips, no
+  testimonials. Quietest variant.
+
+### FAQ variations
+- **Two-column accordion** — Questions split across left/right columns.
+  Each question is a `glass-card` that expands inline using `<details>`.
+- **Searchable FAQ** — Filter input at top, items hide via Alpine
+  reactivity as the user types. Highlight matched substring.
+- **Categorized tabs** — Pill tabs at top (Billing / Servers / Account)
+  switch between FAQ sets.
+
+### Stats / metric variations
+- **Big-numbers row** — 3-4 large numbers across a row, each with a
+  small label below, separated by thin glass dividers.
+- **Animated counters** — Numbers count up on intersection-observer
+  using Alpine `x-intersect="$el.dataset.target"` + a small JS easing fn.
+- **Sparkline chart per stat** — Inline SVG sparkline in magenta below
+  each number for the trend.
+
+### Modern interaction primitives to layer on top
+- **Scroll-driven reveal** — `transition` on `opacity` + `translate-y`
+  triggered by `x-intersect`. Subtle (`translate-y-2`, `duration-700`).
+- **Subtle parallax** — `transform: translateY(...)` driven by
+  `window.scrollY` via Alpine. 3-5% movement, never more.
+- **Magnetic buttons** — Buttons that translate slightly toward the
+  cursor on hover. CSS-only via `mask-image: radial-gradient(...
+  pointer-events: auto)`.
+- **Glow-on-hover** — Buttons emit a stronger `glow` shadow on hover.
+
 ## Token reference (paste this if the assistant has no repo access)
 
 ```css

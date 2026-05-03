@@ -11,7 +11,7 @@
             <div class="">
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center gap-3">
-                        <div class="bg-background-secondary border border-neutral p-2 rounded-lg">
+                        <div class="glass p-2 rounded-lg">
                             <x-ri-archive-stack-fill class="size-5" />
                         </div>
                         <h2 class="text-xl font-semibold">{{ __('dashboard.active_services') }}</h2>
@@ -23,7 +23,7 @@
                 <div class="space-y-4">
                     <livewire:services.widget status="active" />
                 </div>
-                <x-navigation.link class="bg-background-secondary hover:bg-background-secondary/80 border border-neutral flex items-center justify-center rounded-lg"
+                <x-navigation.link class="glass hover:bg-background-secondary/85 flex items-center justify-center rounded-lg"
                     :href="route('services')">
                     {{ __('dashboard.view_all') }}
                     <x-ri-arrow-right-fill class="size-5" />
@@ -35,9 +35,8 @@
             <div class="">
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center gap-3">
-                        <div class="bg-background-secondary border border-neutral p-2 rounded-lg">
+                        <div class="glass p-2 rounded-lg">
                             <x-ri-customer-service-fill class="size-5" />
-
                         </div>
                         <h2 class="text-xl font-semibold">{{ __('dashboard.open_tickets') }}</h2>
                         <a href="{{ route('tickets.create') }}" wire:navigate>
@@ -51,7 +50,7 @@
                 <div class="space-y-4">
                     <livewire:tickets.widget />
                 </div>
-                <x-navigation.link class="bg-background-secondary hover:bg-background-secondary/80 border border-neutral flex items-center justify-center rounded-lg"
+                <x-navigation.link class="glass hover:bg-background-secondary/85 flex items-center justify-center rounded-lg"
                     :href="route('tickets')">
                     {{ __('dashboard.view_all') }}
                     <x-ri-arrow-right-fill class="size-5 h-5" />
@@ -65,7 +64,7 @@
             <div class="">
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center gap-3">
-                        <div class="bg-background-secondary border border-neutral p-2 rounded-lg">
+                        <div class="glass p-2 rounded-lg">
                             <x-ri-receipt-fill class="size-5" />
                         </div>
                         <h2 class="text-xl font-semibold">{{ __('dashboard.unpaid_invoices') }}</h2>
@@ -77,7 +76,7 @@
                 <div class="space-y-4">
                     <livewire:invoices.widget :limit="3" />
                 </div>
-                <x-navigation.link class="bg-background-secondary hover:bg-background-secondary/80 border border-neutral flex items-center justify-center rounded-lg"
+                <x-navigation.link class="glass hover:bg-background-secondary/85 flex items-center justify-center rounded-lg"
                     :href="route('invoices')">
                     {{ __('dashboard.view_all') }}
                     <x-ri-arrow-right-fill class="size-5 h-5" />

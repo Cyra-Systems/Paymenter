@@ -238,11 +238,31 @@ button[role='switch'] > span {
     color: hsl(var(--color-primary)) !important;
 }
 
-/* Tabs active state */
+/* Tabs — pill-shaped with magenta-tinted glass active state */
+.fi-tabs-tab,
+.fi-tabs-item,
+button.fi-tabs-item {
+    border-radius: var(--radius-xl, 9999px) !important;
+    padding: 0.5rem 1rem !important;
+    border: 0 !important;
+    color: hsl(var(--color-muted)) !important;
+    transition: all 200ms ease;
+}
+
+.fi-tabs-tab:hover,
+.fi-tabs-item:hover {
+    color: hsl(var(--color-base)) !important;
+    background-color: hsl(var(--color-base) / 0.04) !important;
+}
+
 .fi-tabs-tab[aria-selected='true'],
-.fi-tabs-tab.fi-active {
+.fi-tabs-tab.fi-active,
+.fi-tabs-item[aria-selected='true'],
+.fi-tabs-item.fi-selected {
     color: hsl(var(--color-primary)) !important;
-    border-color: hsl(var(--color-primary)) !important;
+    background-color: hsl(var(--color-primary) / 0.15) !important;
+    border: 1px solid hsl(var(--color-primary) / 0.3) !important;
+    box-shadow: 0 0 16px -4px hsl(var(--color-primary) / 0.3);
 }
 
 /* Links + hint actions */
