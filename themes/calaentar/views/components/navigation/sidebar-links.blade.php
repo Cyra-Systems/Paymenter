@@ -103,10 +103,9 @@
         @endisset
         @endforeach
         <div class="flex flex-row items-center mt-4 justify-between md:hidden">
+            @if (class_exists(\App\Livewire\Components\LocaleSwitch::class))
             <livewire:components.locale-switch />
-
-            <x-theme-toggle />
-
+            @endif
         </div>
     </div>
 </div>

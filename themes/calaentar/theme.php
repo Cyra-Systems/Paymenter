@@ -55,6 +55,13 @@ return [
             'default' => 'hsl(320, 90%, 60%)',
         ],
         [
+            'name' => 'admin_primary_hex',
+            'label' => 'Admin Panel - Primary Hex Color',
+            'type' => 'text',
+            'default' => '#f037a5',
+            'description' => 'Hex color used for primary buttons, links and highlights in the Filament admin panel. Filament generates a full 50-950 shade palette from this single value, so changing it tints buttons, badges, focus rings, and active states. Defaults to magenta to match the public theme.',
+        ],
+        [
             'name' => 'secondary',
             'label' => 'Secondary - Purple',
             'type' => 'color',
@@ -149,18 +156,21 @@ return [
             'label' => 'Border Radius - Medium',
             'type' => 'text',
             'default' => '0.75rem',
+            'action' => ResetRadiusAction::class,
         ],
         [
             'name' => 'radius-lg',
             'label' => 'Border Radius - Large',
             'type' => 'text',
             'default' => '1rem',
+            'action' => ResetRadiusAction::class,
         ],
         [
             'name' => 'radius-xl',
             'label' => 'Border Radius - Extra Large',
             'type' => 'text',
             'default' => '1.5rem',
+            'action' => ResetRadiusAction::class,
         ],
 
         // Glass-morphism effect

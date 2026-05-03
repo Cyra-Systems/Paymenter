@@ -62,14 +62,20 @@
             </div>
 
             <div class="flex flex-row items-center">
+                @if (class_exists(\App\Livewire\Components\Cart::class))
                 <livewire:components.cart />
+                @endif
 
                 <div class="items-center hidden md:flex mr-1">
+                    @if (class_exists(\App\Livewire\Components\LocaleSwitch::class))
                     <livewire:components.locale-switch />
+                    @endif
                 </div>
 
                 @if(auth()->check())
+                @if (class_exists(\App\Livewire\Components\Notifications::class))
                 <livewire:components.notifications />
+                @endif
                 <div class="hidden lg:flex">
                     <x-dropdown :showArrow="false">
                         <x-slot:trigger>

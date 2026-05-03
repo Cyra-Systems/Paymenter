@@ -43,13 +43,18 @@ class AdminPanelProvider extends PanelProvider
 
         Notifications::alignment(Alignment::Center);
 
+        $primaryHex = config('settings.theme_' . config('settings.theme', 'default') . '_admin_primary_hex');
+        $primaryColor = $primaryHex && preg_match('/^#?[0-9a-fA-F]{6}$/', ltrim($primaryHex, '#'))
+            ? Color::hex('#' . ltrim($primaryHex, '#'))
+            : Color::Blue;
+
         $panel
             ->default()
             ->id('admin')
             ->path('admin')
             ->spa()
             ->colors([
-                'primary' => Color::Blue,
+                'primary' => $primaryColor,
             ])
             ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             ->favicon(config('settings.favicon') ? Storage::url(config('settings.favicon')) : null)
