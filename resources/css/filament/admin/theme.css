@@ -42,7 +42,7 @@
 
 .fi-topbar,
 .fi-sidebar {
-    background-color: hsl(var(--color-background-secondary) / 0.45) !important;
+    background-color: hsl(var(--color-background-secondary) / 0.6) !important;
     backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
     -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
     border-color: hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
@@ -62,7 +62,7 @@
 .fi-fo-builder-block,
 .fi-fo-builder-item,
 .fi-fo-repeater-item {
-    background-color: hsl(var(--color-background-secondary) / 0.45) !important;
+    background-color: hsl(var(--color-background-secondary) / 0.65) !important;
     backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
     -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
     border: 1px solid hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
@@ -163,12 +163,39 @@ a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-
 
 /* Toggles + checkbox active states */
 [type='checkbox']:checked,
-[type='radio']:checked,
-.fi-toggle-on,
-.fi-toggle[aria-checked='true'] {
+[type='radio']:checked {
     background-color: hsl(var(--color-primary)) !important;
     border-color: hsl(var(--color-primary)) !important;
     background-image: none !important;
+}
+
+/* Filament toggle (switch) — brand gradient track + glow when on, glass when off */
+.fi-toggle,
+button[role='switch'] {
+    background-color: hsl(var(--color-base) / 0.08) !important;
+    background-image: none !important;
+    border: 1px solid hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
+    transition: all 200ms ease;
+}
+
+.fi-toggle[aria-checked='true'],
+button[role='switch'][aria-checked='true'] {
+    background-color: transparent !important;
+    background-image: linear-gradient(var(--gradient-angle, 135deg),
+        hsl(var(--color-primary)) 0%, hsl(var(--color-accent, var(--color-primary))) 100%) !important;
+    border-color: transparent !important;
+    box-shadow:
+        0 0 16px -2px hsl(var(--glow-color, var(--color-primary)) / 0.55),
+        0 1px 0 hsl(var(--color-base) / 0.2) inset !important;
+}
+
+/* Toggle knob — soft white with subtle shadow */
+.fi-toggle > span,
+button[role='switch'] > span {
+    background-color: hsl(0 0% 100%) !important;
+    box-shadow:
+        0 1px 2px hsl(0 0% 0% / 0.3),
+        0 0 0 1px hsl(0 0% 0% / 0.05) !important;
 }
 
 /* Sidebar active item — magenta tint */
