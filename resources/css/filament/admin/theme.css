@@ -5,6 +5,13 @@
 
 @plugin '@tailwindcss/typography';
 
+/* ----------------------------------------------------------------------------
+   Theme integration — variables come from the active theme's
+   views/layouts/colors.blade.php (injected by AdminPanelProvider via the
+   panels::head.end render hook). Falls back gracefully when a variable is
+   not declared by older themes.
+---------------------------------------------------------------------------- */
+
 .fi-wi-stats-overview-stat.success .fi-wi-stats-overview-stat-value {
     color: theme('colors.green.600');
 }
@@ -13,32 +20,93 @@
     color: theme('colors.red.500');
 }
 
-.fi-topbar, 
-.fi-sidebar, 
-.fi-contained, 
-.fi-ta-ctn, 
-.fi-wi-stats-overview-stat, 
+/* Surfaces */
+.fi-topbar,
+.fi-sidebar,
+.fi-contained,
+.fi-ta-ctn,
+.fi-wi-stats-overview-stat,
 .fi-section-has-header,
 .fi-widget-wrapper,
-.fi-tabs {
+.fi-tabs,
+.fi-modal-window,
+.fi-dropdown-panel {
     background-color: hsl(var(--color-background-secondary));
+    border-color: hsl(var(--color-base) / var(--glass-border-opacity, 0.12));
 }
 
-.fi-body, .fi-simple-main {
+.fi-body,
+.fi-simple-main {
     background-color: hsl(var(--color-background));
+    background-image:
+        radial-gradient(ellipse 80% 60% at 15% 0%, hsl(var(--gradient-from, var(--color-primary)) / 0.25), transparent 60%),
+        radial-gradient(ellipse 70% 50% at 100% 100%, hsl(var(--gradient-via, var(--color-secondary)) / 0.20), transparent 60%);
+    background-attachment: fixed;
 }
 
-/*
-.fi-sidebar .fi-sidebar-item-label {
+/* Brand-colored accents on primary actions, links, focus rings */
+.fi-btn-color-primary {
+    background-image: linear-gradient(var(--gradient-angle, 135deg),
+        hsl(var(--color-primary)) 0%, hsl(var(--color-accent, var(--color-primary))) 100%) !important;
+    color: white !important;
+    box-shadow:
+        0 0 24px -4px hsl(var(--glow-color, var(--color-primary)) / 0.45),
+        0 0 60px -10px hsl(var(--glow-color, var(--color-primary)) / 0.25);
+    border: none !important;
+}
+
+.fi-btn-color-primary:hover {
+    filter: brightness(1.1);
+}
+
+.fi-link,
+a.fi-link {
+    color: hsl(var(--color-primary));
+}
+
+.fi-input:focus,
+.fi-select-input:focus,
+.fi-textarea:focus,
+[type='checkbox']:focus,
+[type='radio']:focus {
+    --tw-ring-color: hsl(var(--color-primary)) !important;
+    border-color: hsl(var(--color-primary)) !important;
+}
+
+/* Text tones */
+.fi-body,
+.fi-sidebar-item-label,
+.fi-section-content {
+    color: hsl(var(--color-base));
+}
+
+.fi-section-header-description,
+.fi-fo-field-wrp-helper-text,
+.fi-breadcrumbs-item-label {
     color: hsl(var(--color-muted));
 }
-    
-.fi-btn-primary {
-    background-color: hsl(var(--color-primary)) !important;
-    color: hsl(var(--color-inverted)) !important;
+
+/* Border radius scale — accept any CSS value the theme author sets */
+.fi-btn,
+.fi-input,
+.fi-select-input,
+.fi-textarea,
+.fi-badge,
+.fi-tabs-tab,
+.fi-dropdown-list-item {
+    border-radius: var(--radius-md, 0.5rem);
 }
 
-.fi-btn-primary:hover {
-    background-color: hsl(var(--color-secondary)) !important;
+.fi-section,
+.fi-modal-window,
+.fi-ta-ctn,
+.fi-wi-stats-overview-stat,
+.fi-widget-wrapper,
+.fi-dropdown-panel {
+    border-radius: var(--radius-lg, 0.75rem);
 }
-*/
+
+.fi-avatar,
+.fi-icon-btn {
+    border-radius: var(--radius-xl, 9999px);
+}

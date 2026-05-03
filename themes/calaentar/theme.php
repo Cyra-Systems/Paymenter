@@ -1,5 +1,7 @@
 <?php
 
+use App\Admin\Actions\ResetRadiusAction;
+
 return [
     'name' => 'Calaentar',
     'author' => 'Paymenter',
@@ -36,10 +38,13 @@ return [
             'label' => 'Logo display',
             'type' => 'select',
             'options' => [
-                'logo-only' => 'Logo only',
-                'logo-and-name' => 'Logo and Name',
+                'none' => 'None',
+                'text' => 'Text only',
+                'logo' => 'Logo only',
+                'logo-and-name' => 'Logo and Text',
             ],
             'default' => 'logo-and-name',
+            'description' => 'What to show in the navigation: nothing, just the site name, just the logo image, or both.',
         ],
 
         // Brand colors (dark-only theme — no light variants)
@@ -137,6 +142,7 @@ return [
             'label' => 'Border Radius - Small',
             'type' => 'text',
             'default' => '0.5rem',
+            'action' => ResetRadiusAction::class,
         ],
         [
             'name' => 'radius-md',

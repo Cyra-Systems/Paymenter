@@ -11,12 +11,17 @@
             :class="hasAside ? 'w-full' : 'container'">
 
             <div class="flex flex-row items-center">
+                @php($logoDisplay = theme('logo_display', 'logo-and-name'))
+                @if ($logoDisplay !== 'none')
                 <a href="{{ route('home') }}" class="flex flex-row items-center h-10 gap-2" wire:navigate>
+                    @if (in_array($logoDisplay, ['logo', 'logo-only', 'logo-and-name']))
                     <x-logo class="h-8" />
-                    @if(theme('logo_display', 'logo-and-name') != 'logo-only')
+                    @endif
+                    @if (in_array($logoDisplay, ['text', 'logo-and-name']))
                     <span class="text-xl font-bold leading-none flex items-center">{{ config('app.name') }}</span>
                     @endif
                 </a>
+                @endif
                 <div class="md:flex hidden flex-row ml-6">
                     @foreach (\App\Classes\Navigation::getLinks() as $nav)
                     @if (isset($nav['children']) && count($nav['children']) > 0)
