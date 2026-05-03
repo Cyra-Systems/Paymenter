@@ -40,7 +40,7 @@
 
         /* Glass-morphism */
         --glass-blur: {{ theme('glass-blur', '14px') }};
-        --glass-opacity: {{ theme('glass-opacity', '0.5') }};
+        --glass-opacity: {{ theme('glass-opacity', '0.75') }};
         --glass-border-opacity: {{ theme('glass-border-opacity', '0.12') }};
     }
 </style>

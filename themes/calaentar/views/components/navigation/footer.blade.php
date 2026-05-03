@@ -1,4 +1,4 @@
-<footer class="w-full px-4 py-4 lg:mt-72 mt-44 backdrop-blur-xl bg-background/40 border-t border-white/5">
+<footer class="w-full px-4 py-4 lg:mt-72 mt-44 backdrop-blur-xl bg-background-secondary/75 border-t border-white/5">
     <div class="container my-12 mx-auto px-4 sm:px-6 md:px-8 lg:px-10">
         <div class="flex flex-col md:flex-row justify-between gap-2 items-center">
             <div class="flex flex-col gap-6 items-start">

@@ -10,7 +10,7 @@
                         @if ($loop->last) x-data x-init="$nextTick(() => $el.scrollIntoView({ block: 'end' }))" @endif>
                         <div class="flex items-center justify-between gap-4">
                             <div class="flex items-center gap-3">
-                                <img src="{{ $message->user->avatar }}" class="size-8 rounded-full border border-neutral bg-background" alt="{{ $message->user->name }} avatar" />
+                                <div class="size-8 rounded-full bg-background border border-white/10 flex items-center justify-center text-base text-sm font-semibold uppercase select-none" title="{{ $message->user->name }}">{{ \Illuminate\Support\Str::substr($message->user->name, 0, 1) }}</div>
                                 <div class="flex flex-col">
                                     <h2 class="text-lg font-semibold">{{ $message->user->name }}</h2>
                                     <p class="text-sm text-gray-500">{{ $message->created_at->diffForHumans() }}</p>

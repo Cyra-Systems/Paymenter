@@ -1,4 +1,4 @@
-<nav class="w-full px-4 lg:px-8 backdrop-blur-xl bg-background/40 border-b border-white/5 md:h-16 flex md:flex-row flex-col justify-between fixed top-0 z-20">
+<nav class="w-full px-4 lg:px-8 backdrop-blur-xl bg-background-secondary/75 border-b border-white/5 md:h-16 flex md:flex-row flex-col justify-between fixed top-0 z-20">
     <div
         x-data="{ 
             slideOverOpen: false,
@@ -79,7 +79,7 @@
                 <div class="hidden lg:flex">
                     <x-dropdown :showArrow="false">
                         <x-slot:trigger>
-                            <img src="{{ auth()->user()->avatar }}" class="size-8 rounded-full border border-neutral bg-background" alt="avatar" />
+                            <div class="size-8 rounded-full bg-background border border-white/10 flex items-center justify-center text-base text-sm font-semibold uppercase select-none" aria-label="{{ auth()->user()->name }}">{{ \Illuminate\Support\Str::substr(auth()->user()->name, 0, 1) }}</div>
                         </x-slot:trigger>
                         <x-slot:content>
                             <div class="flex flex-col p-2">
@@ -158,7 +158,7 @@
                     x-show="slideOverOpen"
                     @click.away="slideOverOpen = false"
                     x-transition.opacity.duration.300ms
-                    class="absolute inset-0 bg-background-secondary border-t border-neutral shadow-lg overflow-y-auto flex flex-col">
+                    class="absolute inset-0 backdrop-blur-xl bg-background-secondary/85 border-t border-white/5 shadow-lg overflow-y-auto flex flex-col">
 
                     <div class="flex flex-col h-full p-4">
                         <div class="flex-1 min-h-0 overflow-y-auto">
@@ -174,7 +174,7 @@
                                 class="relative">
 
                                 <button @click="userPanelOpen = true" aria-label="Open user menu" class="flex gap-4 items-center justify-start">
-                                    <img src="{{ auth()->user()->avatar }}" class="size-10 rounded-full border border-neutral bg-background" alt="avatar" />
+                                    <div class="size-10 rounded-full bg-background border border-white/10 flex items-center justify-center text-base font-semibold uppercase select-none" aria-label="{{ auth()->user()->name }}">{{ \Illuminate\Support\Str::substr(auth()->user()->name, 0, 1) }}</div>
                                     <div class="flex flex-col items-start gap-0.5">
                                         <span class="font-bold text-md">{{ auth()->user()->name }}</span>
                                         <span class="text-sm text-base/70">{{ auth()->user()->email }}</span>
@@ -206,9 +206,9 @@
                                     @click.away="userPanelOpen = false"
                                     tabindex="-1"
                                     aria-modal="true">
-                                    <div class="bg-background-secondary shadow-lg rounded-t-2xl border border-neutral p-6">
+                                    <div class="backdrop-blur-xl bg-background-secondary/85 shadow-2xl rounded-t-2xl border border-white/10 p-6">
                                         <div class="flex gap-4 items-center justify-start">
-                                            <img src="{{ auth()->user()->avatar }}" class="size-12 rounded-full border border-neutral bg-background" alt="avatar" />
+                                            <div class="size-12 rounded-full bg-background border border-white/10 flex items-center justify-center text-base text-lg font-semibold uppercase select-none" aria-label="{{ auth()->user()->name }}">{{ \Illuminate\Support\Str::substr(auth()->user()->name, 0, 1) }}</div>
                                             <div class="flex flex-col gap-0.5">
                                                 <span class="font-bold text-lg">{{ auth()->user()->name }}</span>
                                                 <span class="text-sm text-base/70">{{ auth()->user()->email }}</span>

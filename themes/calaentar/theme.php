@@ -185,7 +185,7 @@ return [
             'name' => 'glass-opacity',
             'label' => 'Glass Opacity (0-1)',
             'type' => 'text',
-            'default' => '0.5',
+            'default' => '0.75',
             'description' => 'Surface opacity for glass cards/panels',
         ],
         [
