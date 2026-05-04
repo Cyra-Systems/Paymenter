@@ -499,30 +499,16 @@ class PageForm
                                                 /* --------------------------------------------------------
                                                    Variation 14 — full-screen video / image hero
                                                 -------------------------------------------------------- */
-                                                FileUpload::make('video_url')
-                                                    ->label('Background video (mp4 / webm / mov)')
-                                                    ->disk('public')
-                                                    ->directory('pagebuilder/videos')
-                                                    ->acceptedFileTypes([
-                                                        'video/mp4',
-                                                        'video/webm',
-                                                        'video/quicktime',
-                                                        'video/x-matroska',
-                                                        'video/ogg',
-                                                        'application/octet-stream', // some browsers report mp4/webm this way
-                                                    ])
-                                                    ->maxSize(204800) // 200 MB — must stay <= livewire.temporary_file_upload.rules max
-                                                    ->helperText('Autoplays muted on load. Keep under ~10 MB for snappy first paint; hard cap is 200 MB.')
+                                                TextInput::make('video_url')
+                                                    ->label('Background video URL')
+                                                    ->placeholder('https://cdn.example.com/hero.mp4   or   /storage/heroes/hero.mp4')
+                                                    ->helperText('Direct link to an mp4 / webm / mov. Either paste a full URL, or upload the file to public/storage and use a relative path. Autoplays muted on load — keep it short and small for snappy first paint.')
                                                     ->visible(fn($get) => (string) $get('../../variation') === '14')
                                                     ->columnSpan(2),
-                                                FileUpload::make('image_url')
-                                                    ->label('Background image (used as poster while video loads, or as the only backdrop)')
-                                                    ->disk('public')
-                                                    ->directory('pagebuilder/heroes')
-                                                    ->image()
-                                                    ->imageEditor()
-                                                    ->imageResizeTargetWidth('1920')
-                                                    ->imageResizeTargetHeight('1080')
+                                                TextInput::make('image_url')
+                                                    ->label('Background image URL')
+                                                    ->placeholder('https://cdn.example.com/hero.jpg   or   /storage/heroes/hero.jpg')
+                                                    ->helperText('Used as the video poster while it buffers, or as the only backdrop when no video is set.')
                                                     ->visible(fn($get) => (string) $get('../../variation') === '14')
                                                     ->columnSpan(2),
                                                 Select::make('image_position')

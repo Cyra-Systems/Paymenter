@@ -430,8 +430,18 @@
             $primaryLink = data_get($data, 'content.primary_link', '#');
             $secondaryLink = data_get($data, 'content.secondary_link', '#');
 
-            $videoUrl = data_get($data, 'content.video_url');
-            $imageUrl = data_get($data, 'content.image_url');
+            // Accept full URLs ("https://…", "//cdn.example.com/…") as-is,
+            // and resolve bare paths ("/storage/heroes/foo.mp4" or
+            // "storage/heroes/foo.mp4") against the app's public root.
+            $resolveMediaUrl = function ($url) {
+                $url = trim((string) $url);
+                if ($url === '') return null;
+                if (preg_match('#^(https?:)?//#i', $url) || str_starts_with($url, 'data:')) return $url;
+                return asset(ltrim($url, '/'));
+            };
+
+            $videoUrl = $resolveMediaUrl(data_get($data, 'content.video_url'));
+            $imageUrl = $resolveMediaUrl(data_get($data, 'content.image_url'));
             $imagePosition = data_get($data, 'content.image_position', 'center');
 
             $fullscreen = (bool) data_get($data, 'content.fullscreen', true);
