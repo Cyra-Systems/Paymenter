@@ -407,19 +407,22 @@
         @break
     @case('14')
         @php
-            // Full-screen hero with positionable content. Supports multiple
-            // background formats (in priority order):
-            //   1. video — single URL (video_url) OR an array of sources
-            //      (video_sources => [['src' => '...', 'type' => 'video/webm']])
-            //      so you can ship a transparent webm + mp4 fallback for Safari.
-            //   2. still image (image_url) — used as <img> backdrop and as the
-            //      video poster while the video loads.
-            //   3. brand gradient — fallback when no media is provided.
+            // Full-screen hero with positionable content. Autoplays a video
+            // on page load (muted + looped — no click-to-play, browsers
+            // require muted for autoplay). Falls back to a still image, then
+            // to the brand gradient when no media is configured.
             //
-            // Other content keys: title, subtitle, primary_label,
-            // primary_link, secondary_label, secondary_link, fullscreen,
-            // content_position, overlay_opacity, image_position
-            // (object-position for the image, e.g. "center", "top", "50% 30%").
+            // content keys:
+            //   title, subtitle, primary_label, primary_link,
+            //   secondary_label, secondary_link
+            //   video_url        — mp4 / webm
+            //   image_url        — still backdrop, also used as <video poster>
+            //                       while the video buffers
+            //   image_position   — object-position for the image
+            //                       (e.g. 'center', 'top', '50% 30%')
+            //   fullscreen       — bool; min-h-screen vs min-h-[70vh]
+            //   content_position — center / top-* / bottom-* / center-*
+            //   overlay_opacity  — 0..1 dark overlay over the media
             $title = data_get($data, 'content.title', 'Build Something Beautiful');
             $subtitle = data_get($data, 'content.subtitle', 'Use this space to talk about what makes your product different.');
             $pl = trim((string) data_get($data, 'content.primary_label', 'Get started'));
@@ -428,7 +431,6 @@
             $secondaryLink = data_get($data, 'content.secondary_link', '#');
 
             $videoUrl = data_get($data, 'content.video_url');
-            $videoSources = (array) data_get($data, 'content.video_sources', []);
             $imageUrl = data_get($data, 'content.image_url');
             $imagePosition = data_get($data, 'content.image_position', 'center');
 
@@ -450,27 +452,16 @@
                 'bottom-right'  => 'items-end justify-end text-right pb-20 pr-4 md:pr-16',
             ];
             $posClasses = $positionMap[$position] ?? $positionMap['bottom-center'];
-
-            $hasVideo = $videoUrl || !empty($videoSources);
         @endphp
 
         <section class="relative w-full {{ $heightClass }} overflow-hidden">
-            @if ($hasVideo)
+            @if ($videoUrl)
                 <video
                     class="absolute inset-0 w-full h-full object-cover"
-                    autoplay muted loop playsinline preload="metadata"
+                    autoplay muted loop playsinline preload="auto"
                     @if ($imageUrl) poster="{{ $imageUrl }}" @endif
                 >
-                    @if (!empty($videoSources))
-                        @foreach ($videoSources as $src)
-                            <source
-                                src="{{ data_get($src, 'src') }}"
-                                @if (data_get($src, 'type')) type="{{ data_get($src, 'type') }}" @endif
-                            >
-                        @endforeach
-                    @elseif ($videoUrl)
-                        <source src="{{ $videoUrl }}">
-                    @endif
+                    <source src="{{ $videoUrl }}">
                 </video>
             @elseif ($imageUrl)
                 <img
