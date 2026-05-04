@@ -224,6 +224,30 @@ section[class*="hpb-"] :is(.border-gray-200, .border-gray-300, .border-gray-100)
     @apply glass-card text-base;
 }
 
+/* Edge utilities for the navigation header / sidebar / footer rails.
+   Same blur + bg as .glass, but only the relevant edge is bordered so
+   the three rails read as one continuous milky surface. */
+@utility nav-rail {
+    background-color: hsl(var(--color-background-secondary) / var(--glass-opacity));
+    backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    border-bottom: 1px solid hsl(var(--color-base) / var(--glass-border-opacity));
+}
+
+@utility sidebar-rail {
+    background-color: hsl(var(--color-background-secondary) / var(--glass-opacity));
+    backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    border-inline-end: 1px solid hsl(var(--color-base) / var(--glass-border-opacity));
+}
+
+@utility footer-rail {
+    background-color: hsl(var(--color-background-secondary) / var(--glass-opacity));
+    backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    border-top: 1px solid hsl(var(--color-base) / var(--glass-border-opacity));
+}
+
 @utility glow {
     box-shadow:
         0 0 24px -4px hsl(var(--glow-color) / 0.55),

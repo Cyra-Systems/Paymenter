@@ -105,6 +105,31 @@ class AdminPanelProvider extends PanelProvider
                 fn (): string => '<script>document.documentElement.classList.add("dark");try{localStorage.setItem("theme","dark");}catch(e){}</script>',
             )
             ->renderHook(
+                'panels::body.end',
+                fn (): string => <<<'HTML'
+                <script>
+                (function () {
+                    const replaceAvatars = () => {
+                        document.querySelectorAll('.fi-avatar').forEach((av) => {
+                            if (av.querySelector('.cal-initial')) return;
+                            const img = av.querySelector('img');
+                            const name = (img && (img.alt || img.dataset.name)) || av.getAttribute('aria-label') || av.dataset.name || '';
+                            if (!name.trim()) return;
+                            const span = document.createElement('span');
+                            span.className = 'cal-initial';
+                            span.textContent = name.trim().charAt(0).toUpperCase();
+                            av.appendChild(span);
+                        });
+                    };
+                    if (document.readyState !== 'loading') replaceAvatars();
+                    else document.addEventListener('DOMContentLoaded', replaceAvatars);
+                    document.addEventListener('livewire:navigated', replaceAvatars);
+                    new MutationObserver(replaceAvatars).observe(document.body, { childList: true, subtree: true });
+                })();
+                </script>
+                HTML,
+            )
+            ->renderHook(
                 'panels::head.end',
                 function (): string {
                     $activeTheme = config('settings.theme', 'default');

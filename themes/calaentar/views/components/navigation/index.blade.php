@@ -1,4 +1,4 @@
-<nav class="w-full px-4 lg:px-8 backdrop-blur-xl bg-background-secondary/75 border-b border-white/5 md:h-16 flex md:flex-row flex-col justify-between fixed top-0 z-20">
+<nav class="nav-rail w-full px-4 lg:px-8 md:h-16 flex md:flex-row flex-col justify-between fixed top-0 z-20">
     <div
         x-data="{ 
             slideOverOpen: false,
