@@ -405,10 +405,108 @@
             </div>
         </section>
         @break
+    @case('14')
+        @php
+            // Full-screen hero with optional video background and a positionable
+            // content block. Reads from $data['content']:
+            //   - title, subtitle, primary_label, primary_link, secondary_label,
+            //     secondary_link
+            //   - video_url        (mp4 / webm)
+            //   - video_poster     (fallback image while video loads)
+            //   - fullscreen       (1 / 0)  -> min-h-screen vs min-h-[70vh]
+            //   - content_position one of: center, bottom-center, bottom-left,
+            //     bottom-right, top-center, top-left, top-right, center-left,
+            //     center-right
+            //   - overlay_opacity  (0..1)   -> tint over video (default 0.5)
+            $title = data_get($data, 'content.title', 'Build Something Beautiful');
+            $subtitle = data_get($data, 'content.subtitle', 'Use this space to talk about what makes your product different.');
+            $pl = trim((string) data_get($data, 'content.primary_label', 'Get started'));
+            $sl = trim((string) data_get($data, 'content.secondary_label', 'Learn more'));
+            $primaryLink = data_get($data, 'content.primary_link', '#');
+            $secondaryLink = data_get($data, 'content.secondary_link', '#');
+            $videoUrl = data_get($data, 'content.video_url');
+            $videoPoster = data_get($data, 'content.video_poster');
+            $fullscreen = (bool) data_get($data, 'content.fullscreen', true);
+            $position = data_get($data, 'content.content_position', 'bottom-center');
+            $overlay = (float) data_get($data, 'content.overlay_opacity', 0.5);
+
+            $heightClass = $fullscreen ? 'min-h-screen' : 'min-h-[70vh]';
+
+            $positionMap = [
+                'center'        => 'items-center justify-center text-center',
+                'top-center'    => 'items-start justify-center text-center pt-20',
+                'top-left'      => 'items-start justify-start text-left pt-20 pl-4 md:pl-16',
+                'top-right'     => 'items-start justify-end text-right pt-20 pr-4 md:pr-16',
+                'center-left'   => 'items-center justify-start text-left pl-4 md:pl-16',
+                'center-right'  => 'items-center justify-end text-right pr-4 md:pr-16',
+                'bottom-center' => 'items-end justify-center text-center pb-20',
+                'bottom-left'   => 'items-end justify-start text-left pb-20 pl-4 md:pl-16',
+                'bottom-right'  => 'items-end justify-end text-right pb-20 pr-4 md:pr-16',
+            ];
+            $posClasses = $positionMap[$position] ?? $positionMap['bottom-center'];
+        @endphp
+
+        <section class="relative w-full {{ $heightClass }} overflow-hidden">
+            @if ($videoUrl)
+                <video
+                    class="absolute inset-0 w-full h-full object-cover"
+                    autoplay muted loop playsinline preload="metadata"
+                    @if ($videoPoster) poster="{{ $videoPoster }}" @endif
+                >
+                    <source src="{{ $videoUrl }}">
+                </video>
+            @else
+                <div class="absolute inset-0"
+                    style="background-image: linear-gradient({{ data_get($data, 'content.gradient_angle', '135deg') }}, hsl({{ $colorMap['primary'] }}) 0%, hsl({{ $colorMap['secondary'] }}) 100%);">
+                </div>
+            @endif
+
+            <div class="absolute inset-0"
+                style="background:
+                    linear-gradient(to bottom, hsl({{ $colorMap['background'] }} / 0) 0%, hsl({{ $colorMap['background'] }} / {{ $overlay }}) 100%),
+                    radial-gradient(ellipse 80% 60% at 15% 0%, hsl({{ $colorMap['primary'] }} / 0.20), transparent 60%);">
+            </div>
+
+            <div class="relative z-10 w-full h-full flex {{ $posClasses }} container mx-auto px-4">
+                <div class="max-w-3xl">
+                    <h1 class="text-5xl md:text-7xl font-bold mb-6 leading-tight"
+                        style="color: hsl({{ $colorMap['base'] }});">
+                        {!! $title !!}
+                    </h1>
+                    <p class="text-xl md:text-2xl mb-8"
+                        style="color: hsl({{ $colorMap['muted'] }});">
+                        {!! $subtitle !!}
+                    </p>
+                    @if ($pl || $sl)
+                    <div class="flex flex-col sm:flex-row gap-4 {{ str_contains($position, 'right') ? 'sm:justify-end' : (str_contains($position, 'center') ? 'sm:justify-center' : '') }}">
+                        @if ($pl)
+                        <a href="{{ $primaryLink }}"
+                            class="inline-flex items-center justify-center px-8 py-4 text-white font-semibold rounded-full transition hover:brightness-110"
+                            style="background-image: linear-gradient(135deg, hsl({{ $colorMap['primary'] }}) 0%, hsl({{ $colorMap['secondary'] }}) 100%);
+                                   box-shadow: 0 0 24px -4px hsl({{ $colorMap['primary'] }} / 0.55);">
+                            {!! $pl !!}
+                        </a>
+                        @endif
+                        @if ($sl)
+                        <a href="{{ $secondaryLink }}"
+                            class="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-full backdrop-blur-md border transition hover:bg-white/10"
+                            style="background-color: hsl({{ $colorMap['background'] }} / 0.4);
+                                   border-color: hsl({{ $colorMap['base'] }} / 0.15);
+                                   color: hsl({{ $colorMap['base'] }});">
+                            {!! $sl !!}
+                        </a>
+                        @endif
+                    </div>
+                    @endif
+                </div>
+            </div>
+        </section>
+        @break
+
     @default
         <section class="py-15 relative">
             <div class="relative z-10 container mx-auto px-4 py-15 text-center">
-                <h1 
+                <h1
                     class="text-5xl md:text-6xl font-bold mb-6 text-gray-900 dark:text-white"
                 >
                     Enterprise-Grade Hosting Solutions

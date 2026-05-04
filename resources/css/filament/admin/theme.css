@@ -130,44 +130,15 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Buttons — multiple selectors so we catch every Filament button variant.
-   Filament 5's buttons use a mix of class-based (.fi-btn-color-primary)
-   and Tailwind utility-based (bg-primary-600) styling depending on context;
-   we override at every level.
+   Buttons — keep them lean. Primary buttons read their colour from the
+   Filament Color::hex(...) palette generated in AdminPanelProvider from
+   the admin_primary_hex setting; we DON'T add a gradient here any more
+   (it was distracting on every Save / Update / Submit). Secondary / gray
+   / icon buttons get a faint glass tint so they remain visible on the
+   dark page.
 ---------------------------------------------------------------------------- */
 
-/* Primary — magenta gradient + glow. Targets every place Filament puts the
-   primary-colour button: standalone .fi-btn-color-primary, action menu
-   triggers, submit buttons in form actions, the row "View" link in tables. */
-.fi-btn-color-primary,
-button.fi-btn-color-primary,
-a.fi-btn-color-primary,
-.fi-btn[data-color="primary"],
-[class*="bg-primary-6"]:is(button, a),
-.fi-fo-actions button[type="submit"],
-.fi-form-actions button[type="submit"],
-.fi-modal-footer button[type="submit"] {
-    background-color: hsl(var(--color-primary)) !important;
-    background-image: linear-gradient(var(--gradient-angle, 135deg),
-        hsl(var(--color-primary)) 0%, hsl(var(--color-accent, var(--color-primary))) 100%) !important;
-    color: white !important;
-    box-shadow:
-        0 0 24px -4px hsl(var(--glow-color, var(--color-primary)) / 0.50),
-        0 1px 0 hsl(var(--color-base) / 0.15) inset !important;
-    border: none !important;
-}
-
-.fi-btn-color-primary:hover,
-button.fi-btn-color-primary:hover,
-a.fi-btn-color-primary:hover,
-.fi-btn[data-color="primary"]:hover,
-.fi-fo-actions button[type="submit"]:hover,
-.fi-form-actions button[type="submit"]:hover,
-.fi-modal-footer button[type="submit"]:hover {
-    filter: brightness(1.12) !important;
-}
-
-/* Secondary / gray / outlined / icon — light glass tint. */
+/* Secondary / gray / outlined / icon — light glass tint */
 .fi-btn-color-gray,
 .fi-btn-color-secondary,
 button.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):not(.fi-btn-color-info):not([type="submit"]),
@@ -215,10 +186,10 @@ a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-
 }
 
 /* ----------------------------------------------------------------------------
-   Checkboxes -> toggles. Convert every native checkbox in admin into a
-   pill-shaped toggle switch (track + knob). Skips checkboxes that are
-   already wrapped as an explicit toggle (role="switch") or inside a
-   table-row selector (.fi-ta-record-checkbox) so bulk-select still works.
+   Checkboxes -> toggles. <input> elements don't support pseudo-elements,
+   so the pill knob is drawn with a radial-gradient inside the input's own
+   background. Animating background-position slides the knob smoothly.
+   Skips table row/page selection checkboxes which need to stay as boxes.
 ---------------------------------------------------------------------------- */
 
 input[type="checkbox"]:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox) {
@@ -226,39 +197,21 @@ input[type="checkbox"]:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-
     -webkit-appearance: none !important;
     width: 2.25rem !important;
     height: 1.25rem !important;
-    background-color: hsl(var(--color-base) / 0.1) !important;
-    border-radius: 9999px !important;
     border: 0 !important;
-    position: relative !important;
+    border-radius: 9999px !important;
     cursor: pointer !important;
-    transition: background-color 200ms ease;
     flex-shrink: 0;
-}
-
-input[type="checkbox"]:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox)::before {
-    content: "";
-    position: absolute;
-    top: 0.125rem;
-    inset-inline-start: 0.125rem;
-    width: 1rem;
-    height: 1rem;
-    background: white;
-    border-radius: 50%;
-    transition: transform 200ms ease;
-    box-shadow: 0 1px 2px hsl(0 0% 0% / 0.3);
+    background-color: hsl(var(--color-base) / 0.12) !important;
+    background-image: radial-gradient(circle 0.5rem at center, white 100%, transparent 100%) !important;
+    background-repeat: no-repeat !important;
+    background-position: 0.125rem center !important;
+    background-size: 1rem 1rem !important;
+    transition: background-color 200ms ease, background-position 200ms ease !important;
 }
 
 input[type="checkbox"]:checked:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox) {
     background-color: hsl(var(--color-primary)) !important;
-    background-image: none !important;
-}
-
-input[type="checkbox"]:checked:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox)::before {
-    transform: translateX(1rem);
-}
-
-[dir="rtl"] input[type="checkbox"]:checked:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox)::before {
-    transform: translateX(-1rem);
+    background-position: calc(100% - 0.125rem) center !important;
 }
 
 /* Radios stay native */

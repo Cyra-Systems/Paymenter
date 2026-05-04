@@ -109,15 +109,40 @@ class AdminPanelProvider extends PanelProvider
                 fn (): string => <<<'HTML'
                 <script>
                 (function () {
+                    const initialFor = (txt) => {
+                        if (!txt) return '';
+                        const t = txt.trim();
+                        return t ? t.charAt(0).toUpperCase() : '';
+                    };
                     const replaceAvatars = () => {
-                        document.querySelectorAll('.fi-avatar').forEach((av) => {
-                            if (av.querySelector('.cal-initial')) return;
+                        // Cover .fi-avatar, any element whose class contains "avatar",
+                        // and any rounded-full img directly (Filament 5 sometimes drops the
+                        // wrapper class).
+                        const wrappers = new Set();
+                        document.querySelectorAll('.fi-avatar, [class*="avatar" i]').forEach(el => wrappers.add(el));
+                        document.querySelectorAll('img[src*="gravatar" i], img[src*="ui-avatars" i]').forEach((img) => {
+                            if (img.parentElement) wrappers.add(img.parentElement);
+                        });
+                        wrappers.forEach((av) => {
+                            if (av.querySelector(':scope > .cal-initial')) return;
                             const img = av.querySelector('img');
-                            const name = (img && (img.alt || img.dataset.name)) || av.getAttribute('aria-label') || av.dataset.name || '';
-                            if (!name.trim()) return;
+                            const name = (img && (img.alt || img.dataset.name)) ||
+                                          av.getAttribute('aria-label') ||
+                                          av.dataset.name ||
+                                          av.textContent || '';
+                            const ch = initialFor(name);
+                            if (!ch) return;
+                            // Force the wrapper into a positioning context + dark chip.
+                            if (getComputedStyle(av).position === 'static') av.style.position = 'relative';
+                            av.style.overflow = 'hidden';
+                            if (img) {
+                                img.style.opacity = '0';
+                                img.style.visibility = 'hidden';
+                            }
                             const span = document.createElement('span');
                             span.className = 'cal-initial';
-                            span.textContent = name.trim().charAt(0).toUpperCase();
+                            span.textContent = ch;
+                            span.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:hsl(var(--color-base));background:hsl(var(--color-background));font-weight:600;text-transform:uppercase;font-size:0.875rem;line-height:1;user-select:none;pointer-events:none;border-radius:inherit;z-index:2';
                             av.appendChild(span);
                         });
                     };
