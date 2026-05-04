@@ -31,21 +31,32 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Rails — header, sidebar use their own opacity settings.
+   Rails — header & sidebar carry the body's radial gradient anchored to the
+   viewport (background-attachment: fixed) so the magenta/purple ambient
+   continues seamlessly through them. The high-opacity base color combined
+   with backdrop-blur hides whatever page content scrolls underneath.
 ---------------------------------------------------------------------------- */
 
 .fi-topbar {
-    background-color: hsl(var(--color-background-secondary) / var(--header-opacity, 0.9)) !important;
-    backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
-    -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
+    background-color: hsl(var(--color-background) / 0.82) !important;
+    background-image:
+        radial-gradient(ellipse 80% 60% at 15% 0%, hsl(var(--gradient-from, var(--color-primary)) / 0.30), transparent 60%),
+        radial-gradient(ellipse 70% 50% at 100% 100%, hsl(var(--gradient-via, var(--color-secondary)) / 0.25), transparent 60%);
+    background-attachment: fixed !important;
+    backdrop-filter: blur(28px) saturate(140%);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
     border-bottom: 1px solid hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
     box-shadow: none !important;
 }
 
 .fi-sidebar {
-    background-color: hsl(var(--color-background-secondary) / var(--sidebar-opacity, 0.9)) !important;
-    backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
-    -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
+    background-color: hsl(var(--color-background) / 0.82) !important;
+    background-image:
+        radial-gradient(ellipse 80% 60% at 15% 0%, hsl(var(--gradient-from, var(--color-primary)) / 0.30), transparent 60%),
+        radial-gradient(ellipse 70% 50% at 100% 100%, hsl(var(--gradient-via, var(--color-secondary)) / 0.25), transparent 60%);
+    background-attachment: fixed !important;
+    backdrop-filter: blur(28px) saturate(140%);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
     border-color: hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
     border-top: 0 !important;
 }
@@ -154,6 +165,32 @@ a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-
     color: hsl(var(--color-base)) !important;
 }
 
+/* Primary / status-colored buttons keep Filament's auto-generated fill
+   (from admin_primary_hex via Color::hex), but force the label/icon to
+   white so we never get magenta-on-magenta. */
+.fi-btn-color-primary,
+button[type="submit"].fi-btn-color-primary,
+a.fi-btn-color-primary,
+.fi-btn-color-danger,
+.fi-btn-color-info,
+.fi-btn-color-success,
+.fi-btn-color-warning {
+    color: white !important;
+}
+
+.fi-btn-color-primary .fi-btn-label,
+.fi-btn-color-primary svg,
+.fi-btn-color-danger .fi-btn-label,
+.fi-btn-color-danger svg,
+.fi-btn-color-info .fi-btn-label,
+.fi-btn-color-info svg,
+.fi-btn-color-success .fi-btn-label,
+.fi-btn-color-success svg,
+.fi-btn-color-warning .fi-btn-label,
+.fi-btn-color-warning svg {
+    color: inherit !important;
+}
+
 /* Misc surfaces (file-upload trigger, table search input, pagination) */
 .fi-fo-file-upload,
 .fi-ta-search-input-ctn,
@@ -172,9 +209,14 @@ a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-
 .fi-select-input,
 .fi-textarea,
 .fi-input-wrp {
-    background-color: hsl(var(--color-base) / 0.04) !important;
-    border-color: hsl(var(--color-base) / 0.1) !important;
+    background-color: hsl(var(--color-base) / 0.06) !important;
+    border-color: hsl(var(--color-base) / 0.12) !important;
     color: hsl(var(--color-base)) !important;
+}
+
+.fi-input::placeholder,
+.fi-textarea::placeholder {
+    color: hsl(var(--color-muted) / 0.6) !important;
 }
 
 .fi-input:focus,
@@ -185,14 +227,34 @@ a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-
     border-color: hsl(var(--color-primary)) !important;
 }
 
+/* File-upload drop zone — give it room so the inner "Browse" link and any
+   nested toggles don't visually overlap with the surrounding label. */
+.fi-fo-file-upload {
+    padding: 1rem !important;
+    min-height: 5rem;
+    background-color: hsl(var(--color-base) / 0.04) !important;
+    border: 1px dashed hsl(var(--color-base) / 0.18) !important;
+    border-radius: var(--radius-md, 0.5rem) !important;
+    color: hsl(var(--color-base)) !important;
+}
+
+.fi-fo-file-upload:hover {
+    background-color: hsl(var(--color-base) / 0.06) !important;
+    border-color: hsl(var(--color-primary) / 0.4) !important;
+}
+
 /* ----------------------------------------------------------------------------
-   Checkboxes -> toggles. <input> elements don't support pseudo-elements,
-   so the pill knob is drawn with a radial-gradient inside the input's own
-   background. Animating background-position slides the knob smoothly.
-   Skips table row/page selection checkboxes which need to stay as boxes.
+   Checkboxes & toggles.
+   - Plain checkboxes (and Filament input-based toggles with role="switch")
+     are converted to a pill with a knob drawn via radial-gradient on the
+     input's own background — pseudo-elements don't apply to <input>.
+   - Filament's button-based toggle ( <button role="switch"> with a child
+     span knob ) gets coloured separately so its native span knob keeps
+     working.
+   Excluded: table row / page selection checkboxes, which stay as boxes.
 ---------------------------------------------------------------------------- */
 
-input[type="checkbox"]:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox) {
+input[type="checkbox"]:not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox) {
     appearance: none !important;
     -webkit-appearance: none !important;
     width: 2.25rem !important;
@@ -201,7 +263,7 @@ input[type="checkbox"]:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-
     border-radius: 9999px !important;
     cursor: pointer !important;
     flex-shrink: 0;
-    background-color: hsl(var(--color-base) / 0.12) !important;
+    background-color: hsl(var(--color-base) / 0.15) !important;
     background-image: radial-gradient(circle 0.5rem at center, white 100%, transparent 100%) !important;
     background-repeat: no-repeat !important;
     background-position: 0.125rem center !important;
@@ -209,7 +271,7 @@ input[type="checkbox"]:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-
     transition: background-color 200ms ease, background-position 200ms ease !important;
 }
 
-input[type="checkbox"]:checked:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox) {
+input[type="checkbox"]:checked:not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox) {
     background-color: hsl(var(--color-primary)) !important;
     background-position: calc(100% - 0.125rem) center !important;
 }
@@ -221,12 +283,29 @@ input[type="radio"]:checked {
     background-image: none !important;
 }
 
-/* Filament native toggle (already a switch) */
+/* Filament native toggle: <button role='switch'> with a child span knob.
+   Style track + knob explicitly so we don't end up with a knob and no track. */
 button[role='switch'] {
-    background-color: hsl(var(--color-base) / 0.1) !important;
+    background-color: hsl(var(--color-base) / 0.15) !important;
     background-image: none !important;
     box-shadow: none !important;
     border: 0 !important;
+    width: 2.25rem !important;
+    min-width: 2.25rem !important;
+    height: 1.25rem !important;
+    border-radius: 9999px !important;
+    padding: 0.125rem !important;
+    transition: background-color 200ms ease !important;
+}
+
+button[role='switch'] > span,
+button[role='switch'] > div {
+    background-color: white !important;
+    width: 1rem !important;
+    height: 1rem !important;
+    border-radius: 9999px !important;
+    box-shadow: 0 1px 2px hsl(0 0% 0% / 0.4) !important;
+    transition: transform 200ms ease !important;
 }
 
 button[role='switch'][aria-checked='true'] {
