@@ -49,6 +49,7 @@ class PageForm
                     '10' => 'Headline + stat blocks row',
                     '12' => 'Full-width text band',
                     '13' => 'Two-row hero (CTA band)',
+                    '14' => 'Full-screen video / image (calaentar)',
                 ]
             ],
             'cta' => [
@@ -493,6 +494,79 @@ class PageForm
                                                 TextInput::make('image_alt')
                                                     ->label('Hero image alt')
                                                     ->visible(fn($get) => in_array($get('../../variation'), ['3', '7']))
+                                                    ->columnSpan(1),
+
+                                                /* --------------------------------------------------------
+                                                   Variation 14 — full-screen video / image hero
+                                                -------------------------------------------------------- */
+                                                FileUpload::make('video_url')
+                                                    ->label('Background video (mp4 / webm)')
+                                                    ->disk('public')
+                                                    ->directory('pagebuilder/videos')
+                                                    ->acceptedFileTypes(['video/mp4', 'video/webm', 'video/quicktime'])
+                                                    ->maxSize(10240)
+                                                    ->helperText('Autoplays muted on page load. Keep under ~5 MB for snappy loading.')
+                                                    ->visible(fn($get) => $get('../../variation') === '14')
+                                                    ->columnSpan(2),
+                                                FileUpload::make('image_url')
+                                                    ->label('Background image (used as poster while video loads, or as the only backdrop)')
+                                                    ->disk('public')
+                                                    ->directory('pagebuilder/heroes')
+                                                    ->image()
+                                                    ->imageEditor()
+                                                    ->imageResizeTargetWidth('1920')
+                                                    ->imageResizeTargetHeight('1080')
+                                                    ->visible(fn($get) => $get('../../variation') === '14')
+                                                    ->columnSpan(2),
+                                                Select::make('image_position')
+                                                    ->label('Image focus point')
+                                                    ->options([
+                                                        'center'      => 'Center',
+                                                        'top'         => 'Top',
+                                                        'bottom'      => 'Bottom',
+                                                        'left'        => 'Left',
+                                                        'right'       => 'Right',
+                                                        'top left'    => 'Top left',
+                                                        'top right'   => 'Top right',
+                                                        'bottom left' => 'Bottom left',
+                                                        'bottom right'=> 'Bottom right',
+                                                    ])
+                                                    ->default('center')
+                                                    ->native(false)
+                                                    ->visible(fn($get) => $get('../../variation') === '14')
+                                                    ->columnSpan(1),
+                                                Toggle::make('fullscreen')
+                                                    ->label('Full screen (100vh)')
+                                                    ->helperText('Off = 70vh.')
+                                                    ->default(true)
+                                                    ->visible(fn($get) => $get('../../variation') === '14')
+                                                    ->columnSpan(1),
+                                                Select::make('content_position')
+                                                    ->label('Content position')
+                                                    ->options([
+                                                        'center'        => 'Center',
+                                                        'top-center'    => 'Top center',
+                                                        'top-left'      => 'Top left',
+                                                        'top-right'     => 'Top right',
+                                                        'center-left'   => 'Middle left',
+                                                        'center-right'  => 'Middle right',
+                                                        'bottom-center' => 'Bottom center',
+                                                        'bottom-left'   => 'Bottom left',
+                                                        'bottom-right'  => 'Bottom right',
+                                                    ])
+                                                    ->default('bottom-center')
+                                                    ->native(false)
+                                                    ->visible(fn($get) => $get('../../variation') === '14')
+                                                    ->columnSpan(1),
+                                                TextInput::make('overlay_opacity')
+                                                    ->label('Dark overlay (0-1)')
+                                                    ->numeric()
+                                                    ->step(0.05)
+                                                    ->minValue(0)
+                                                    ->maxValue(1)
+                                                    ->default(0.5)
+                                                    ->helperText('Higher = darker tint over the media so the headline stays readable.')
+                                                    ->visible(fn($get) => $get('../../variation') === '14')
                                                     ->columnSpan(1),
 
                                                 Repeater::make('badges')
