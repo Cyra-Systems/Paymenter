@@ -506,7 +506,7 @@ class PageForm
                                                     ->acceptedFileTypes(['video/mp4', 'video/webm', 'video/quicktime'])
                                                     ->maxSize(10240)
                                                     ->helperText('Autoplays muted on page load. Keep under ~5 MB for snappy loading.')
-                                                    ->visible(fn($get) => $get('../../variation') === '14')
+                                                    ->visible(fn($get) => (string) $get('../../variation') === '14')
                                                     ->columnSpan(2),
                                                 FileUpload::make('image_url')
                                                     ->label('Background image (used as poster while video loads, or as the only backdrop)')
@@ -516,7 +516,7 @@ class PageForm
                                                     ->imageEditor()
                                                     ->imageResizeTargetWidth('1920')
                                                     ->imageResizeTargetHeight('1080')
-                                                    ->visible(fn($get) => $get('../../variation') === '14')
+                                                    ->visible(fn($get) => (string) $get('../../variation') === '14')
                                                     ->columnSpan(2),
                                                 Select::make('image_position')
                                                     ->label('Image focus point')
@@ -533,13 +533,13 @@ class PageForm
                                                     ])
                                                     ->default('center')
                                                     ->native(false)
-                                                    ->visible(fn($get) => $get('../../variation') === '14')
+                                                    ->visible(fn($get) => (string) $get('../../variation') === '14')
                                                     ->columnSpan(1),
                                                 Toggle::make('fullscreen')
                                                     ->label('Full screen (100vh)')
                                                     ->helperText('Off = 70vh.')
                                                     ->default(true)
-                                                    ->visible(fn($get) => $get('../../variation') === '14')
+                                                    ->visible(fn($get) => (string) $get('../../variation') === '14')
                                                     ->columnSpan(1),
                                                 Select::make('content_position')
                                                     ->label('Content position')
@@ -556,7 +556,7 @@ class PageForm
                                                     ])
                                                     ->default('bottom-center')
                                                     ->native(false)
-                                                    ->visible(fn($get) => $get('../../variation') === '14')
+                                                    ->visible(fn($get) => (string) $get('../../variation') === '14')
                                                     ->columnSpan(1),
                                                 TextInput::make('overlay_opacity')
                                                     ->label('Dark overlay (0-1)')
@@ -566,7 +566,7 @@ class PageForm
                                                     ->maxValue(1)
                                                     ->default(0.5)
                                                     ->helperText('Higher = darker tint over the media so the headline stays readable.')
-                                                    ->visible(fn($get) => $get('../../variation') === '14')
+                                                    ->visible(fn($get) => (string) $get('../../variation') === '14')
                                                     ->columnSpan(1),
 
                                                 Repeater::make('badges')
