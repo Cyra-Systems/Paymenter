@@ -183,10 +183,10 @@ return [
         ],
         [
             'name' => 'glass-opacity',
-            'label' => 'Glass Opacity (0-1)',
+            'label' => 'Card Opacity (0-1)',
             'type' => 'text',
-            'default' => '0.75',
-            'description' => 'Surface opacity for glass cards/panels',
+            'default' => '0.85',
+            'description' => 'Default surface opacity for cards / sections',
         ],
         [
             'name' => 'glass-border-opacity',
@@ -194,6 +194,34 @@ return [
             'type' => 'text',
             'default' => '0.12',
             'description' => 'Opacity of the soft border on glass surfaces',
+        ],
+        [
+            'name' => 'header-opacity',
+            'label' => 'Header Opacity (0-1)',
+            'type' => 'text',
+            'default' => '0.9',
+            'description' => 'Opacity of the navigation header bar',
+        ],
+        [
+            'name' => 'sidebar-opacity',
+            'label' => 'Sidebar Opacity (0-1)',
+            'type' => 'text',
+            'default' => '0.9',
+            'description' => 'Opacity of the sidebar rail',
+        ],
+        [
+            'name' => 'footer-opacity',
+            'label' => 'Footer Opacity (0-1)',
+            'type' => 'text',
+            'default' => '0.9',
+            'description' => 'Opacity of the footer bar',
+        ],
+        [
+            'name' => 'overlay-opacity',
+            'label' => 'Popup / Overlay Opacity (0-1)',
+            'type' => 'text',
+            'default' => '0.95',
+            'description' => 'Opacity of dropdowns, modals, user menu and any floating panel',
         ],
     ],
 ];

@@ -27,7 +27,7 @@
     </button>
 
     <div x-ref="dropdown"
-        class="absolute mt-2 {{ $width ?? "w-48" }} px-2 py-1 glass rounded-xl shadow-2xl z-10"
+        class="absolute mt-2 {{ $width ?? "w-48" }} px-2 py-1 overlay-glass rounded-xl shadow-2xl z-10"
         x-bind:style="{
             left: `-${adjustWidth}px`,
         }"

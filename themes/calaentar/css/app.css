@@ -225,27 +225,34 @@ section[class*="hpb-"] :is(.border-gray-200, .border-gray-300, .border-gray-100)
 }
 
 /* Edge utilities for the navigation header / sidebar / footer rails.
-   Same blur + bg as .glass, but only the relevant edge is bordered so
-   the three rails read as one continuous milky surface. */
+   Each has its own opacity setting so the user can tune them individually
+   from admin -> Settings -> Theme. */
 @utility nav-rail {
-    background-color: hsl(var(--color-background-secondary) / var(--glass-opacity));
+    background-color: hsl(var(--color-background-secondary) / var(--header-opacity, 0.9));
     backdrop-filter: blur(var(--glass-blur)) saturate(140%);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
     border-bottom: 1px solid hsl(var(--color-base) / var(--glass-border-opacity));
 }
 
 @utility sidebar-rail {
-    background-color: hsl(var(--color-background-secondary) / var(--glass-opacity));
+    background-color: hsl(var(--color-background-secondary) / var(--sidebar-opacity, 0.9));
     backdrop-filter: blur(var(--glass-blur)) saturate(140%);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
     border-inline-end: 1px solid hsl(var(--color-base) / var(--glass-border-opacity));
 }
 
 @utility footer-rail {
-    background-color: hsl(var(--color-background-secondary) / var(--glass-opacity));
+    background-color: hsl(var(--color-background-secondary) / var(--footer-opacity, 0.9));
     backdrop-filter: blur(var(--glass-blur)) saturate(140%);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
     border-top: 1px solid hsl(var(--color-base) / var(--glass-border-opacity));
+}
+
+@utility overlay-glass {
+    background-color: hsl(var(--color-background-secondary) / var(--overlay-opacity, 0.95));
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid hsl(var(--color-base) / var(--glass-border-opacity));
 }
 
 @utility glow {

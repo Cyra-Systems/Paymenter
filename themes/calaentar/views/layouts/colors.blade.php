@@ -40,7 +40,11 @@
 
         /* Glass-morphism */
         --glass-blur: {{ theme('glass-blur', '14px') }};
-        --glass-opacity: {{ theme('glass-opacity', '0.75') }};
+        --glass-opacity: {{ theme('glass-opacity', '0.85') }};
         --glass-border-opacity: {{ theme('glass-border-opacity', '0.12') }};
+        --header-opacity: {{ theme('header-opacity', '0.9') }};
+        --sidebar-opacity: {{ theme('sidebar-opacity', '0.9') }};
+        --footer-opacity: {{ theme('footer-opacity', '0.9') }};
+        --overlay-opacity: {{ theme('overlay-opacity', '0.95') }};
     }
 </style>

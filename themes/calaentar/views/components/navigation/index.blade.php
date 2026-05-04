@@ -158,7 +158,7 @@
                     x-show="slideOverOpen"
                     @click.away="slideOverOpen = false"
                     x-transition.opacity.duration.300ms
-                    class="absolute inset-0 backdrop-blur-xl bg-background-secondary/85 border-t border-white/5 shadow-lg overflow-y-auto flex flex-col">
+                    class="absolute inset-0 overlay-glass border-t shadow-lg overflow-y-auto flex flex-col">
 
                     <div class="flex flex-col h-full p-4">
                         <div class="flex-1 min-h-0 overflow-y-auto">
@@ -206,7 +206,7 @@
                                     @click.away="userPanelOpen = false"
                                     tabindex="-1"
                                     aria-modal="true">
-                                    <div class="backdrop-blur-xl bg-background-secondary/85 shadow-2xl rounded-t-2xl border border-white/10 p-6">
+                                    <div class="overlay-glass shadow-2xl rounded-t-2xl p-6">
                                         <div class="flex gap-4 items-center justify-start">
                                             <div class="size-12 rounded-full bg-background border border-white/10 flex items-center justify-center text-base text-lg font-semibold uppercase select-none" aria-label="{{ auth()->user()->name }}">{{ \Illuminate\Support\Str::substr(auth()->user()->name, 0, 1) }}</div>
                                             <div class="flex flex-col gap-0.5">

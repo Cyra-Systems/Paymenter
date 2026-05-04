@@ -8,7 +8,8 @@
 /* ----------------------------------------------------------------------------
    Theme integration — variables come from the active theme's
    views/layouts/colors.blade.php (injected by AdminPanelProvider via the
-   panels::head.end render hook).
+   panels::head.end render hook). Opacities are split per surface so the
+   user can tune header / sidebar / footer / overlay / card independently.
 ---------------------------------------------------------------------------- */
 
 .fi-wi-stats-overview-stat.success .fi-wi-stats-overview-stat-value {
@@ -19,10 +20,7 @@
     color: theme('colors.red.500');
 }
 
-/* ----------------------------------------------------------------------------
-   Page background — radial purple/magenta gradients on a dark base
----------------------------------------------------------------------------- */
-
+/* Page background — radial purple/magenta gradients on a dark base */
 .fi-body,
 .fi-simple-main {
     background-color: hsl(var(--color-background));
@@ -34,42 +32,32 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Glass surfaces — every card / panel / section gets translucency,
-   backdrop-blur, a thin highlighted border, and a layered shadow for depth.
-   Uses !important sparingly so Filament's class-based defaults can be
-   overridden without targeting deep child selectors.
+   Rails — header, sidebar use their own opacity settings. The settings let
+   you push these toward fully opaque without affecting card opacity.
 ---------------------------------------------------------------------------- */
 
-/* Topbar / sidebar share the same milky glass as the public site nav/footer
-   (bg-background-secondary at the configured --glass-opacity). Removing the
-   sidebar's top-edge highlight + topbar's bottom-edge highlight smooths the
-   visual seam where they meet. */
-.fi-topbar,
-.fi-sidebar {
-    background-color: hsl(var(--color-background-secondary) / var(--glass-opacity, 0.75)) !important;
+.fi-topbar {
+    background-color: hsl(var(--color-background-secondary) / var(--header-opacity, 0.9)) !important;
     backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
     -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
-    border-color: hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
-}
-
-.fi-sidebar {
-    border-top: 0 !important;
-}
-
-.fi-topbar {
-    border-bottom: 1px solid hsl(var(--color-base) / 0.05) !important;
+    border-bottom: 1px solid hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
     box-shadow: none !important;
 }
 
-/* Cards — only one level of glass per visual surface. Style the canonical
-   "card" elements (section, table container, modal, widget, dropdown panel,
-   stat tile) with the same glass treatment, plus the Settings page form
-   wrapper (.fi-fo-component-ctn that directly contains a tab strip).
-   Generic .fi-form / .fi-fo-component-ctn / .fi-fo-form are left transparent
-   so they don't double-card when nested inside an existing section. */
+.fi-sidebar {
+    background-color: hsl(var(--color-background-secondary) / var(--sidebar-opacity, 0.9)) !important;
+    backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
+    border-color: hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
+    border-top: 0 !important;
+}
+
+/* ----------------------------------------------------------------------------
+   Cards — only one level of glass per visual surface.
+---------------------------------------------------------------------------- */
+
 .fi-section,
 .fi-section-has-header,
-.fi-modal-window,
 .fi-ta-ctn,
 .fi-wi-stats-overview-stat,
 .fi-widget-wrapper,
@@ -77,7 +65,7 @@
 .fi-fo-builder-block,
 .fi-fo-builder-item,
 .fi-fo-repeater-item {
-    background-color: hsl(var(--color-background-secondary) / var(--glass-opacity, 0.75)) !important;
+    background-color: hsl(var(--color-background-secondary) / var(--glass-opacity, 0.85)) !important;
     backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
     -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(140%);
     border: 1px solid hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
@@ -88,11 +76,17 @@
         0 12px 32px -12px hsl(0 0% 0% / 0.35);
 }
 
-/* Generic form wrappers stay transparent so a section that contains a form
-   doesn't read as a card-inside-a-card. */
+/* Generic form wrappers stay transparent — prevent card-inside-card */
 .fi-form,
 .fi-fo-form,
-.fi-fo-component-ctn:not(:has(> .fi-tabs)) {
+.fi-fo-component-ctn:not(:has(> .fi-tabs)),
+.fi-fo-fieldset,
+.fi-fo-tab-content,
+.fi-fo-tabs-content,
+.fi-fo-component-ctn .fi-fo-component-ctn,
+.fi-section .fi-fo-component-ctn,
+.fi-section .fi-section,
+.fi-fo-component-ctn:has(> .fi-tabs) .fi-fo-component-ctn {
     background-color: transparent !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
@@ -100,15 +94,19 @@
     box-shadow: none !important;
 }
 
-/* Dropdown panels (user menu, action menus, search results) need higher
-   opacity so the items underneath them stay legible. */
+/* ----------------------------------------------------------------------------
+   Overlays — dropdowns, modals, user menu, search results. Use the
+   higher overlay-opacity so floating panels stay readable.
+---------------------------------------------------------------------------- */
+
+.fi-modal-window,
 .fi-dropdown-panel,
 .fi-user-menu,
 .fi-global-search-results {
-    background-color: hsl(var(--color-background-secondary) / 0.92) !important;
+    background-color: hsl(var(--color-background-secondary) / var(--overlay-opacity, 0.95)) !important;
     backdrop-filter: blur(20px) saturate(160%) !important;
     -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
-    border: 1px solid hsl(var(--color-base) / 0.1) !important;
+    border: 1px solid hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
     border-radius: var(--radius-lg, 0.75rem) !important;
     box-shadow:
         0 1px 0 hsl(var(--color-base) / 0.08) inset,
@@ -116,21 +114,12 @@
         0 20px 50px -12px hsl(0 0% 0% / 0.5) !important;
 }
 
-/* Tabs container — no double-border, just inherit the parent card's glass */
+/* Tabs container — no double-border */
 .fi-tabs {
     background-color: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
-}
-
-/* Settings page wrapper — round the form that holds tabs */
-.fi-page form,
-form.fi-fo-component-ctn,
-.fi-fo-component-ctn:has(> .fi-tabs),
-.fi-page > div > form {
-    border-radius: var(--radius-lg, 0.75rem) !important;
-    overflow: hidden;
 }
 
 /* ----------------------------------------------------------------------------
@@ -156,41 +145,56 @@ a.fi-btn-color-primary {
     filter: brightness(1.12);
 }
 
-/* Secondary / gray / outlined — translucent glass */
+/* Secondary / gray / outlined / icon — light glass tint, never dark.
+   Uses --color-base at low alpha so the button stays visible on dark
+   backgrounds instead of fading into the page. */
 .fi-btn-color-gray,
 .fi-btn-color-secondary,
-button.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning),
-a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning),
+button.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):not(.fi-btn-color-info),
+a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):not(.fi-btn-color-info),
 .fi-icon-btn {
-    background-color: hsl(var(--color-background-secondary) / 0.55) !important;
+    background-color: hsl(var(--color-base) / 0.06) !important;
+    background-image: none !important;
     backdrop-filter: blur(var(--glass-blur, 14px));
     -webkit-backdrop-filter: blur(var(--glass-blur, 14px));
-    border: 1px solid hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
+    border: 1px solid hsl(var(--color-base) / 0.1) !important;
     color: hsl(var(--color-base)) !important;
-    box-shadow:
-        0 1px 0 hsl(var(--color-base) / 0.06) inset,
-        0 1px 2px hsl(0 0% 0% / 0.2);
 }
 
 .fi-btn-color-gray:hover,
 .fi-btn-color-secondary:hover,
-button.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):hover,
-a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):hover {
-    background-color: hsl(var(--color-background-secondary) / 0.75) !important;
+button.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):not(.fi-btn-color-info):hover,
+a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):not(.fi-btn-color-info):hover,
+.fi-icon-btn:hover {
+    background-color: hsl(var(--color-base) / 0.12) !important;
+    border-color: hsl(var(--color-base) / 0.18) !important;
+}
+
+/* File-upload "Browse" / "Drag & Drop" wrapper, filter triggers,
+   table column toggle — all the misc surfaces that read as black today
+   if Filament uses its default gray utilities. */
+.fi-fo-file-upload,
+.fi-fo-file-upload-trigger,
+.fi-ta-filters-trigger,
+.fi-ta-toggle-columns-trigger,
+.fi-ta-search-input-ctn,
+.fi-ta-search-field,
+.fi-pagination-item button {
+    background-color: hsl(var(--color-base) / 0.06) !important;
+    border: 1px solid hsl(var(--color-base) / 0.1) !important;
+    color: hsl(var(--color-base)) !important;
 }
 
 /* ----------------------------------------------------------------------------
-   Form inputs — translucent glass with primary focus ring
+   Form inputs — light glass tint with primary focus ring
 ---------------------------------------------------------------------------- */
 
 .fi-input,
 .fi-select-input,
 .fi-textarea,
 .fi-input-wrp {
-    background-color: hsl(var(--color-background) / 0.4) !important;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-color: hsl(var(--color-base) / var(--glass-border-opacity, 0.12)) !important;
+    background-color: hsl(var(--color-base) / 0.04) !important;
+    border-color: hsl(var(--color-base) / 0.1) !important;
     color: hsl(var(--color-base)) !important;
 }
 
@@ -212,13 +216,13 @@ a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-
     background-image: none !important;
 }
 
-/* Filament toggle (switch) — minimal styling. Off-state uses a faint glass
-   tint, on-state uses the primary token (no gradient + glow because that
-   bleeds outside the toggle's bounding box and overlaps surrounding form
-   elements). The knob keeps Filament's default circle. */
+/* Filament toggle (switch) — minimal styling so it doesn't bleed into
+   neighbouring form elements. */
 button[role='switch'] {
     background-color: hsl(var(--color-base) / 0.1) !important;
     background-image: none !important;
+    box-shadow: none !important;
+    border: 0 !important;
 }
 
 button[role='switch'][aria-checked='true'] {
@@ -282,10 +286,7 @@ a.fi-link,
     border-color: hsl(var(--color-primary) / 0.3) !important;
 }
 
-/* ----------------------------------------------------------------------------
-   Hide Filament's dark/light theme switcher — calaentar admin is dark only
----------------------------------------------------------------------------- */
-
+/* Hide Filament's dark/light theme switcher — calaentar admin is dark only */
 .fi-theme-switcher,
 .fi-user-menu-theme-switcher,
 [x-data*="themeSwitcher" i],
@@ -296,10 +297,7 @@ button[aria-label*="theme" i],
     display: none !important;
 }
 
-/* ----------------------------------------------------------------------------
-   Text tones
----------------------------------------------------------------------------- */
-
+/* Text tones */
 .fi-body,
 .fi-sidebar-item-label,
 .fi-section-content {
@@ -312,10 +310,7 @@ button[aria-label*="theme" i],
     color: hsl(var(--color-muted));
 }
 
-/* ----------------------------------------------------------------------------
-   Border-radius scale
----------------------------------------------------------------------------- */
-
+/* Border-radius scale */
 .fi-btn,
 .fi-input,
 .fi-select-input,
@@ -332,20 +327,23 @@ button[aria-label*="theme" i],
 }
 
 /* ----------------------------------------------------------------------------
-   Avatars — admin side mirrors the public site: hide the gravatar image
-   and show the user's first initial inside a dark glass circle. The
-   initial text is injected by a JS render hook in AdminPanelProvider on
-   page load (it reads the alt attribute of the original img).
+   Avatars — admin side mirrors the public site: hide every <img> the
+   .fi-avatar wrapper might contain and inject the user's first initial via
+   the JS render hook in AdminPanelProvider. CSS handles the visual chip,
+   JS handles the letter.
 ---------------------------------------------------------------------------- */
 .fi-avatar {
     background-color: hsl(var(--color-background)) !important;
+    background-image: none !important;
     border: 1px solid hsl(var(--color-base) / 0.1) !important;
     position: relative;
     overflow: hidden;
 }
 
-.fi-avatar img {
+.fi-avatar img,
+.fi-avatar svg {
     opacity: 0 !important;
+    visibility: hidden !important;
 }
 
 .fi-avatar .cal-initial {
@@ -361,13 +359,14 @@ button[aria-label*="theme" i],
     pointer-events: none;
     font-size: 0.875rem;
     line-height: 1;
+    z-index: 2;
 }
 
-/* Larger avatars get a larger letter */
 .fi-avatar.fi-size-lg .cal-initial,
 .fi-avatar[style*="width: 2.5rem"] .cal-initial {
     font-size: 1rem;
 }
+
 .fi-avatar.fi-size-xl .cal-initial,
 .fi-avatar[style*="width: 3rem"] .cal-initial {
     font-size: 1.25rem;
