@@ -500,12 +500,19 @@ class PageForm
                                                    Variation 14 — full-screen video / image hero
                                                 -------------------------------------------------------- */
                                                 FileUpload::make('video_url')
-                                                    ->label('Background video (mp4 / webm)')
+                                                    ->label('Background video (mp4 / webm / mov)')
                                                     ->disk('public')
                                                     ->directory('pagebuilder/videos')
-                                                    ->acceptedFileTypes(['video/mp4', 'video/webm', 'video/quicktime'])
-                                                    ->maxSize(10240)
-                                                    ->helperText('Autoplays muted on page load. Keep under ~5 MB for snappy loading.')
+                                                    ->acceptedFileTypes([
+                                                        'video/mp4',
+                                                        'video/webm',
+                                                        'video/quicktime',
+                                                        'video/x-matroska',
+                                                        'video/ogg',
+                                                        'application/octet-stream', // some browsers report mp4/webm this way
+                                                    ])
+                                                    ->maxSize(204800) // 200 MB — must stay <= livewire.temporary_file_upload.rules max
+                                                    ->helperText('Autoplays muted on load. Keep under ~10 MB for snappy first paint; hard cap is 200 MB.')
                                                     ->visible(fn($get) => (string) $get('../../variation') === '14')
                                                     ->columnSpan(2),
                                                 FileUpload::make('image_url')
