@@ -8,8 +8,7 @@
 /* ----------------------------------------------------------------------------
    Theme integration — variables come from the active theme's
    views/layouts/colors.blade.php (injected by AdminPanelProvider via the
-   panels::head.end render hook). Opacities are split per surface so the
-   user can tune header / sidebar / footer / overlay / card independently.
+   panels::head.end render hook).
 ---------------------------------------------------------------------------- */
 
 .fi-wi-stats-overview-stat.success .fi-wi-stats-overview-stat-value {
@@ -32,8 +31,7 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Rails — header, sidebar use their own opacity settings. The settings let
-   you push these toward fully opaque without affecting card opacity.
+   Rails — header, sidebar use their own opacity settings.
 ---------------------------------------------------------------------------- */
 
 .fi-topbar {
@@ -53,7 +51,10 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Cards — only one level of glass per visual surface.
+   Cards — always apply glass to the canonical card classes. No :has()
+   tricks, no nested-strip rules. Filament occasionally double-cards a
+   form-inside-section, but that's a minor issue compared to having no
+   card at all on Settings.
 ---------------------------------------------------------------------------- */
 
 .fi-section,
@@ -61,7 +62,7 @@
 .fi-ta-ctn,
 .fi-wi-stats-overview-stat,
 .fi-widget-wrapper,
-.fi-fo-component-ctn:has(> .fi-tabs),
+.fi-fo-component-ctn,
 .fi-fo-builder-block,
 .fi-fo-builder-item,
 .fi-fo-repeater-item {
@@ -76,17 +77,24 @@
         0 12px 32px -12px hsl(0 0% 0% / 0.35);
 }
 
-/* Generic form wrappers stay transparent — prevent card-inside-card */
+/* The .fi-fo-component-ctn that's a DIRECT CHILD of another
+   .fi-fo-component-ctn or a .fi-section is a nested form — make it
+   transparent so we don't double-card. Only direct-child selector to
+   keep the rule narrow and not break unrelated boxes. */
+.fi-fo-component-ctn > .fi-fo-component-ctn,
+.fi-section > .fi-fo-component-ctn,
+.fi-section > .fi-section {
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+/* Plain form / fieldset wrappers stay transparent. */
 .fi-form,
-.fi-fo-form,
-.fi-fo-component-ctn:not(:has(> .fi-tabs)),
-.fi-fo-fieldset,
-.fi-fo-tab-content,
-.fi-fo-tabs-content,
-.fi-fo-component-ctn .fi-fo-component-ctn,
-.fi-section .fi-fo-component-ctn,
-.fi-section .fi-section,
-.fi-fo-component-ctn:has(> .fi-tabs) .fi-fo-component-ctn {
+.fi-fo-form {
     background-color: transparent !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
@@ -95,8 +103,7 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Overlays — dropdowns, modals, user menu, search results. Use the
-   higher overlay-opacity so floating panels stay readable.
+   Overlays — dropdowns, modals, user menu, search results.
 ---------------------------------------------------------------------------- */
 
 .fi-modal-window,
@@ -123,36 +130,51 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Buttons
+   Buttons — multiple selectors so we catch every Filament button variant.
+   Filament 5's buttons use a mix of class-based (.fi-btn-color-primary)
+   and Tailwind utility-based (bg-primary-600) styling depending on context;
+   we override at every level.
 ---------------------------------------------------------------------------- */
 
-/* Primary — magenta gradient + glow */
+/* Primary — magenta gradient + glow. Targets every place Filament puts the
+   primary-colour button: standalone .fi-btn-color-primary, action menu
+   triggers, submit buttons in form actions, the row "View" link in tables. */
 .fi-btn-color-primary,
 button.fi-btn-color-primary,
-a.fi-btn-color-primary {
-    background-color: transparent !important;
+a.fi-btn-color-primary,
+.fi-btn[data-color="primary"],
+[class*="bg-primary-6"]:is(button, a),
+.fi-fo-actions button[type="submit"],
+.fi-form-actions button[type="submit"],
+.fi-modal-footer button[type="submit"] {
+    background-color: hsl(var(--color-primary)) !important;
     background-image: linear-gradient(var(--gradient-angle, 135deg),
         hsl(var(--color-primary)) 0%, hsl(var(--color-accent, var(--color-primary))) 100%) !important;
     color: white !important;
     box-shadow:
         0 0 24px -4px hsl(var(--glow-color, var(--color-primary)) / 0.50),
-        0 0 60px -10px hsl(var(--glow-color, var(--color-primary)) / 0.30),
         0 1px 0 hsl(var(--color-base) / 0.15) inset !important;
     border: none !important;
 }
 
-.fi-btn-color-primary:hover {
-    filter: brightness(1.12);
+.fi-btn-color-primary:hover,
+button.fi-btn-color-primary:hover,
+a.fi-btn-color-primary:hover,
+.fi-btn[data-color="primary"]:hover,
+.fi-fo-actions button[type="submit"]:hover,
+.fi-form-actions button[type="submit"]:hover,
+.fi-modal-footer button[type="submit"]:hover {
+    filter: brightness(1.12) !important;
 }
 
-/* Secondary / gray / outlined / icon — light glass tint, never dark.
-   Uses --color-base at low alpha so the button stays visible on dark
-   backgrounds instead of fading into the page. */
+/* Secondary / gray / outlined / icon — light glass tint. */
 .fi-btn-color-gray,
 .fi-btn-color-secondary,
-button.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):not(.fi-btn-color-info),
+button.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):not(.fi-btn-color-info):not([type="submit"]),
 a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):not(.fi-btn-color-info),
-.fi-icon-btn {
+.fi-icon-btn,
+.fi-ta-filters-trigger,
+.fi-ta-toggle-columns-trigger {
     background-color: hsl(var(--color-base) / 0.06) !important;
     background-image: none !important;
     backdrop-filter: blur(var(--glass-blur, 14px));
@@ -161,22 +183,8 @@ a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-
     color: hsl(var(--color-base)) !important;
 }
 
-.fi-btn-color-gray:hover,
-.fi-btn-color-secondary:hover,
-button.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):not(.fi-btn-color-info):hover,
-a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-success):not(.fi-btn-color-warning):not(.fi-btn-color-info):hover,
-.fi-icon-btn:hover {
-    background-color: hsl(var(--color-base) / 0.12) !important;
-    border-color: hsl(var(--color-base) / 0.18) !important;
-}
-
-/* File-upload "Browse" / "Drag & Drop" wrapper, filter triggers,
-   table column toggle — all the misc surfaces that read as black today
-   if Filament uses its default gray utilities. */
+/* Misc surfaces (file-upload trigger, table search input, pagination) */
 .fi-fo-file-upload,
-.fi-fo-file-upload-trigger,
-.fi-ta-filters-trigger,
-.fi-ta-toggle-columns-trigger,
 .fi-ta-search-input-ctn,
 .fi-ta-search-field,
 .fi-pagination-item button {
@@ -186,7 +194,7 @@ a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-
 }
 
 /* ----------------------------------------------------------------------------
-   Form inputs — light glass tint with primary focus ring
+   Form inputs
 ---------------------------------------------------------------------------- */
 
 .fi-input,
@@ -201,23 +209,66 @@ a.fi-btn:not(.fi-btn-color-primary):not(.fi-btn-color-danger):not(.fi-btn-color-
 .fi-input:focus,
 .fi-select-input:focus,
 .fi-textarea:focus,
-[type='checkbox']:focus,
-[type='radio']:focus,
 .fi-input-wrp:focus-within {
     --tw-ring-color: hsl(var(--color-primary)) !important;
     border-color: hsl(var(--color-primary)) !important;
 }
 
-/* Toggles + checkbox active states */
-[type='checkbox']:checked,
-[type='radio']:checked {
+/* ----------------------------------------------------------------------------
+   Checkboxes -> toggles. Convert every native checkbox in admin into a
+   pill-shaped toggle switch (track + knob). Skips checkboxes that are
+   already wrapped as an explicit toggle (role="switch") or inside a
+   table-row selector (.fi-ta-record-checkbox) so bulk-select still works.
+---------------------------------------------------------------------------- */
+
+input[type="checkbox"]:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox) {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    width: 2.25rem !important;
+    height: 1.25rem !important;
+    background-color: hsl(var(--color-base) / 0.1) !important;
+    border-radius: 9999px !important;
+    border: 0 !important;
+    position: relative !important;
+    cursor: pointer !important;
+    transition: background-color 200ms ease;
+    flex-shrink: 0;
+}
+
+input[type="checkbox"]:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox)::before {
+    content: "";
+    position: absolute;
+    top: 0.125rem;
+    inset-inline-start: 0.125rem;
+    width: 1rem;
+    height: 1rem;
+    background: white;
+    border-radius: 50%;
+    transition: transform 200ms ease;
+    box-shadow: 0 1px 2px hsl(0 0% 0% / 0.3);
+}
+
+input[type="checkbox"]:checked:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox) {
+    background-color: hsl(var(--color-primary)) !important;
+    background-image: none !important;
+}
+
+input[type="checkbox"]:checked:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox)::before {
+    transform: translateX(1rem);
+}
+
+[dir="rtl"] input[type="checkbox"]:checked:not([role="switch"]):not(.fi-ta-record-checkbox):not(.fi-ta-page-checkbox)::before {
+    transform: translateX(-1rem);
+}
+
+/* Radios stay native */
+input[type="radio"]:checked {
     background-color: hsl(var(--color-primary)) !important;
     border-color: hsl(var(--color-primary)) !important;
     background-image: none !important;
 }
 
-/* Filament toggle (switch) — minimal styling so it doesn't bleed into
-   neighbouring form elements. */
+/* Filament native toggle (already a switch) */
 button[role='switch'] {
     background-color: hsl(var(--color-base) / 0.1) !important;
     background-image: none !important;
@@ -230,7 +281,7 @@ button[role='switch'][aria-checked='true'] {
     background-image: none !important;
 }
 
-/* Sidebar active item — magenta tint */
+/* Sidebar active item */
 .fi-sidebar-item-active > .fi-sidebar-item-button,
 .fi-sidebar-item-active .fi-sidebar-item-button {
     background-color: hsl(var(--color-primary) / 0.18) !important;
@@ -241,7 +292,7 @@ button[role='switch'][aria-checked='true'] {
     color: hsl(var(--color-primary)) !important;
 }
 
-/* Tabs — pill-shaped with magenta-tinted glass active state */
+/* Tabs */
 .fi-tabs-tab,
 .fi-tabs-item,
 button.fi-tabs-item {
@@ -286,7 +337,7 @@ a.fi-link,
     border-color: hsl(var(--color-primary) / 0.3) !important;
 }
 
-/* Hide Filament's dark/light theme switcher — calaentar admin is dark only */
+/* Hide Filament's dark/light theme switcher */
 .fi-theme-switcher,
 .fi-user-menu-theme-switcher,
 [x-data*="themeSwitcher" i],
@@ -327,10 +378,7 @@ button[aria-label*="theme" i],
 }
 
 /* ----------------------------------------------------------------------------
-   Avatars — admin side mirrors the public site: hide every <img> the
-   .fi-avatar wrapper might contain and inject the user's first initial via
-   the JS render hook in AdminPanelProvider. CSS handles the visual chip,
-   JS handles the letter.
+   Avatars — admin side mirrors the public site.
 ---------------------------------------------------------------------------- */
 .fi-avatar {
     background-color: hsl(var(--color-background)) !important;
