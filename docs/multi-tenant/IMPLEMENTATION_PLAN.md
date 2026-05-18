@@ -1,12 +1,13 @@
 # Implementation Plan
 
-A phased roadmap. Each phase ends with a **"Done when"** checklist; do not
-start the next phase until the previous one's checklist passes. Phases are
-sized so any one can ship to staging in a working week by a single engineer.
+Phased roadmap. Each phase ends with a **"Done when"** checklist; do
+not start the next phase until the previous one's checklist passes. Each
+phase is sized to ship in roughly a working week by a single engineer.
 
 > **Conventions:** all changes live on `claude/multi-tenant-*` branches.
-> Migrations land in `database/migrations/` (central) or
-> `database/migrations/tenant/` (tenant) per AD-004.
+> Migrations live in `database/migrations/`. Tenant-scoped tables use
+> the `TenantScoped` migration trait described in `ARCHITECTURE.md`
+> AD-005.
 
 ---
 
@@ -14,113 +15,111 @@ sized so any one can ship to staging in a working week by a single engineer.
 
 **Goal.** Make sure the repo is healthy before we touch tenancy.
 
-1. Confirm `php artisan test` passes against a fresh DB.
-2. Confirm `./vendor/bin/pint --test` and `./vendor/bin/phpstan analyse`
-   are clean.
-3. Snapshot baseline metrics: number of routes, number of migrations,
-   number of Filament resources. Record in this file under "Baseline".
-4. Create a staging environment that mirrors production.
+1. Switch dev/CI DB from MariaDB to Postgres 16+. Update `.env.example`,
+   `docker-compose.example.yml`, `phpunit.xml`.
+2. Confirm `php artisan test` passes on Postgres.
+3. Confirm `./vendor/bin/pint --test` and `./vendor/bin/phpstan analyse`
+   clean.
+4. Snapshot baseline: number of routes, number of migrations, number of
+   Filament resources. Record below.
 
-**Done when.** Green CI on `main`, staging mirrors prod, baseline recorded.
+**Done when.** Green CI on Postgres, baseline recorded.
 
 ### Baseline (fill in after Phase 0)
 
 - Migrations: 71 (`ls database/migrations/ | wc -l`).
-- Models: 53 (`ls app/Models/ -F | grep -v / | wc -l`).
+- Models: 53.
 - Filament resources: _TBD_.
 - Livewire routes: _TBD_.
 
 ---
 
-## Phase 1 — Install `stancl/tenancy`, define `Tenant` model
+## Phase 1 — Install `stancl/tenancy`, define `Tenant`, central tables
 
-**Goal.** Get the tenancy package wired without changing app behaviour.
+**Goal.** Get the tenancy package and Postgres roles wired without
+changing app behaviour.
 
 1. `composer require stancl/tenancy:^4.0`.
-2. `php artisan tenancy:install` — generates `config/tenancy.php`, the
-   `tenants` migration, and the `TenancyServiceProvider`.
-3. Create the central migrations:
-   - `tenants` (id `uuid`, `data` json, timestamps) — provided by package.
-   - `domains` (id, tenant_id, domain, primary, ssl_status) — provided.
-   - `central_users` (id, name, email, password) — new.
-   - `central_plans` (id, name, slug, monthly_price, included_users,
-     included_services, included_extensions, ...) — new.
-4. Create `App\Models\Tenant extends Stancl\Tenancy\Database\Models\Tenant`.
-   Wire its `IncrementApiHits` / events later.
-5. Configure the tenant connection in `config/database.php`:
-   ```php
-   'tenant' => [
-       'driver' => 'mysql',
-       'host'   => env('TENANT_DB_HOST', env('DB_HOST')),
-       'port'   => env('TENANT_DB_PORT', env('DB_PORT')),
-       // database is set per-request by stancl
-       'username' => env('TENANT_DB_USERNAME', env('DB_USERNAME')),
-       'password' => env('TENANT_DB_PASSWORD', env('DB_PASSWORD')),
-       'charset'  => 'utf8mb4',
-       'collation' => 'utf8mb4_unicode_ci',
-   ],
-   ```
-6. Set `config/tenancy.php`:
-   ```php
-   'database' => ['template_tenant_connection' => 'tenant', 'prefix' => 'tenant_'],
-   'migration_parameters' => ['--path' => 'database/migrations/tenant', '--realpath' => true],
-   ```
+2. `php artisan tenancy:install` — generates `config/tenancy.php` and
+   the `TenancyServiceProvider`.
+3. Configure `config/tenancy.php` for **single-database** mode (no DB
+   creation per tenant).
+4. Create central migrations (all in `database/migrations/`):
+   - `tenants` (id uuid, data jsonb, status, timestamps).
+   - `domains` (id, tenant_id fk, domain unique, primary, ssl_status).
+   - `central_users` (id, name, email, password, …).
+   - `central_plans` (id, slug, name, monthly_price_cents,
+     `platform_fee_bps`, `platform_fee_flat_cents`, `included_users`,
+     `included_services`, `included_extensions`, `byo_themes_allowed`,
+     `js_in_themes_allowed`, …).
+   - `central_sessions` (default Laravel sessions schema).
+   - `extension_catalogue` (see `EXTENSIONS.md`).
+   - `theme_catalogue` (see `THEMES.md`).
+   - `stripe_platform_ledger` (see `STRIPE_CONNECT.md`).
+5. Create Postgres roles `paymenter_app` (NOBYPASSRLS) and
+   `paymenter_admin` (BYPASSRLS); grant privileges.
+6. Add the `pg` and `pg_admin` connections in `config/database.php`
+   (see `TENANT_ISOLATION.md` § 1.1).
+7. `App\Models\Tenant extends Stancl\Tenancy\Database\Models\Tenant`
+   with `protected $connection = 'pg_admin'`.
 
-**Done when.** `composer install` works, `php artisan tenants:create` (a
-short Tinker snippet) creates a row in `tenants`, no app routes are broken.
+**Done when.** `composer install` works; `php artisan migrate`
+creates only central tables; creating a tenant row in tinker does not
+break the app; tests still green.
 
 ---
 
-## Phase 2 — Split migrations into central vs tenant
+## Phase 2 — RLS migration helper + retrofit existing tables
 
-**Goal.** Move all existing Paymenter migrations into the tenant folder.
-Keep only central-only tables in `database/migrations/`.
+**Goal.** Add `tenant_id` + RLS policy to every existing tenant-scoped
+table.
 
-1. `mkdir -p database/migrations/tenant`.
-2. Move every existing migration file (all 71) into
-   `database/migrations/tenant/`. Do not rename them — they keep their
-   original timestamps so rebases against upstream stay clean.
-3. Keep in `database/migrations/` **only** the central tables introduced
-   in Phase 1.
-4. Update `config/tenancy.php` `migration_parameters` to point at
-   `database/migrations/tenant`.
-5. Drop the dev DB, then:
-   ```bash
-   php artisan migrate                  # central only
-   php artisan tenants:create acme.test # creates DB + runs tenant migrations
-   ```
+1. Create the `App\Database\TenantScoped` trait that exposes
+   `$this->scopeToTenant('table_name')` (adds column, FK, RLS, policy,
+   default, index — see `ARCHITECTURE.md` AD-005).
+2. Add a new migration `2026_xx_xx_add_tenant_id_to_paymenter_tables.php`
+   that calls `$this->scopeToTenant(...)` on every existing tenant table
+   (users, products, prices, orders, services, invoices, tickets,
+   extensions, settings, …). All 71 upstream tables need this except
+   the framework-level ones (`jobs`, `failed_jobs`, `migrations`,
+   `oauth_*` keys aside — see § 6 in `TENANT_ISOLATION.md`).
+3. For tables that **must not** be tenant-scoped (`migrations`,
+   `oauth_personal_access_clients` perhaps), document why in a comment
+   in the migration.
+4. Add a smoke test that creates two tenants, inserts rows under each,
+   asserts cross-tenant SELECT returns nothing.
 
-**Done when.** `php artisan migrate:fresh` on the central DB creates only
-central tables; creating a tenant runs all 71 migrations on its own DB.
+**Done when.** Fresh `php artisan migrate`, `tenants:seed` two tenants,
+RLS cross-tenant test green.
 
 ---
 
-## Phase 3 — Domain identification middleware
+## Phase 3 — Domain identification + RLS bootstrapper
 
-**Goal.** Make the existing Paymenter routes serve from a tenant subdomain
-without a path prefix.
+**Goal.** Make Paymenter's existing routes serve from a tenant subdomain
+with full RLS context.
 
-1. In `bootstrap/app.php` (Laravel 12 bootstrap), register the tenancy
-   middleware group:
+1. In `bootstrap/app.php`, register the tenancy middleware group:
    ```php
-   ->withMiddleware(function (Middleware $middleware) {
-       $middleware->group('tenant', [
-           \Stancl\Tenancy\Middleware\InitializeTenancyByDomain::class,
-           \Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains::class,
-       ]);
-   })
+   $middleware->group('tenant', [
+       \Stancl\Tenancy\Middleware\InitializeTenancyByDomain::class,
+       \Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains::class,
+       \App\Http\Middleware\EnforceTenantStatus::class,
+   ]);
    ```
-2. In `routes/web.php`, wrap **all** existing routes in the `tenant`
-   middleware group (this is the bulk of the diff).
-3. In `config/tenancy.php`, set `central_domains` to
-   `['central.paymenter.io', 'paymenter.io']` (whatever you use for the
-   landlord).
-4. Update `app/Providers/Filament/AdminPanelProvider.php` panel: leave
-   `->domain(...)` **unset** so it serves on any tenant domain. Add the
-   `tenant` middleware group to the panel.
+2. Implement `App\Tenancy\Bootstrappers\PostgresRlsBootstrapper` and
+   register it in `config/tenancy.php` under `bootstrappers`.
+3. Wrap **all** existing routes in `routes/web.php` in the `tenant`
+   middleware group.
+4. Set `central_domains` in `config/tenancy.php` to
+   `[central.paymenter.io, paymenter.io]`.
+5. Update `AdminPanelProvider` to include the `tenant` middleware on
+   the panel and leave domain unset (so it serves on any tenant
+   domain).
 
-**Done when.** Hitting `acme.test` (with a row in `domains`) serves the
-Paymenter home page from the tenant DB; hitting `central.test` does not.
+**Done when.** Hitting `acme.test` (with a row in `domains`) serves
+Paymenter home from the tenant context (RLS sees only Acme's data);
+hitting `central.test` does not.
 
 ---
 
@@ -128,67 +127,71 @@ Paymenter home page from the tenant DB; hitting `central.test` does not.
 
 **Goal.** Build the operator-facing panel.
 
-1. Create `App\Providers\Filament\CentralPanelProvider` registered in
-   `bootstrap/providers.php`. Configure:
+1. Create `App\Providers\Filament\CentralPanelProvider`:
    ```php
    $panel->id('central')
        ->path('admin')
        ->domain('central.paymenter.io')
        ->authGuard('central')
+       ->databaseConnection('pg_admin')
        ->resources([
            CentralTenantResource::class,
            CentralPlanResource::class,
            CentralDomainResource::class,
            CentralSignupResource::class,
+           CentralExtensionCatalogueResource::class,
+           CentralThemeCatalogueResource::class,
+           CentralStripeLedgerResource::class,
        ]);
    ```
-2. Create the four resources. Tenant resource shows id, primary domain,
-   plan, status (active/suspended/terminated), monthly revenue, signup date.
+2. Create the seven resources. Tenant resource shows id, primary
+   domain, plan, status, monthly recurring revenue from subscription,
+   trailing-30-day platform-fee revenue, signup date.
 3. Add a `CentralUser` model + factory + seeder.
-4. Add `central` guard to `config/auth.php` backed by `central_users`.
+4. Add the `central` guard to `config/auth.php` backed by
+   `central_users` on the `pg_admin` connection.
 
-**Done when.** A central user can sign in at
-`central.paymenter.io/admin`, see all tenants, and toggle a tenant's
-status. The toggle reflects in the tenant's actual behaviour
-(suspended tenants redirect to a "suspended" page).
+**Done when.** A central user signs in at
+`central.paymenter.io/admin`, sees all tenants, can suspend / activate
+a tenant; the change is reflected by `EnforceTenantStatus`.
 
 ---
 
 ## Phase 5 — Bootstrappers (cache, queue, storage, mail, Passport)
 
-**Goal.** Lock down isolation so a misbehaving tenant cannot leak into
-another's data or settings.
+**Goal.** Lock down isolation across cache, queue, storage, mail, and
+Passport.
 
-Implement, in order, the bootstrappers described in `TENANT_ISOLATION.md`.
-Each ships with a feature test that:
+For each, ship a feature test that:
 
 - Creates two tenants.
-- Performs the operation (write a cache key, dispatch a job, write a file,
-  send a mail) inside tenant A.
+- Performs the operation inside tenant A.
 - Asserts tenant B does not see it.
 
-**Done when.** All five isolation tests are green, and a manual sanity
-sweep shows no cross-tenant leakage on the staging environment.
+See `TENANT_ISOLATION.md` for the bootstrapper code.
+
+**Done when.** All five isolation tests green; manual sanity sweep on
+staging shows no cross-tenant leakage.
 
 ---
 
-## Phase 6 — Settings, Extensions, Themes
+## Phase 6 — Settings, Extensions boot, Themes selection
 
-**Goal.** Make Paymenter's pluggable surface area tenant-aware.
+**Goal.** Make Paymenter's pluggable surface tenant-aware.
 
-1. **Settings**: change `App\Providers\SettingsProvider::getSettings()` to
-   key its cache by `tenancy()->initialized ? tenant()->id : 'central'`
-   instead of the hard-coded `"settings"` key.
-2. **Extensions boot**: guard the `Extension::where(...)` query in
+1. **Settings**: confirm `SettingsProvider` plays nicely with the
+   prefixed cache (Phase 5 covers most of it). Add a `config:clear`
+   from the RLS bootstrapper if `config('settings')` is set.
+2. **Extensions boot**: guard the loop in
+   `AppServiceProvider::boot()` at
    `app/Providers/AppServiceProvider.php:140` so it returns early when
-   tenancy is not initialised. Add it to the tenant middleware boot path
-   so extensions still load per-request inside a tenant.
-3. **Themes**: `qirolab/laravel-themer` reads `config('theme.active')`.
-   Hook a per-tenant override into the tenant bootstrapper that reads
-   `setting('theme', 'default')`.
+   tenancy is not initialised. Move the boot call into the tenant
+   middleware group.
+3. **Themes**: hook `Qirolab\Theme\Theme::set(setting('theme.active'))`
+   into the tenant bootstrapper.
 
-**Done when.** Tenant A using theme `dark` and Stripe gateway, Tenant B
-using theme `light` and PayPal gateway — no cross-pollination.
+**Done when.** Tenant A on Stripe + theme `dark`, Tenant B on
+PayPal + theme `light`, no cross-pollination across a full smoke test.
 
 ---
 
@@ -196,19 +199,21 @@ using theme `light` and PayPal gateway — no cross-pollination.
 
 **Goal.** Tenants self-serve signup on the central app.
 
-1. Build the marketing signup form at `central.paymenter.io/signup`:
-   plan, company name, desired subdomain, central admin email.
-2. On submission: create a `signups` row → run `CreateTenantAction`
-   (creates `tenants` row, creates `domains` row, dispatches
-   `CreateTenantDatabaseJob` which runs migrations + the default Paymenter
-   seeder + a "first admin user" custom seeder).
-3. Send a "welcome" email with a magic link to set the first admin
-   password on the tenant.
-4. Provide a `php artisan tenants:delete {id}` Artisan command that drops
-   the tenant DB and storage directory.
+1. Build marketing signup form at `central.paymenter.io/signup`:
+   plan, company name, desired subdomain, admin email, timezone,
+   currency.
+2. On submission: create a central Order on the chosen plan; on first
+   invoice paid, `PaymenterTenant::createServer` runs
+   `CreateTenantAction` (see `PROVISIONING.md`).
+3. `CreateTenantAction` inserts the `tenants` row, the `domains` row,
+   seeds tenant defaults (role, currency, settings, first admin user),
+   runs `passport:keys` inside the tenant filesystem prefix, and
+   triggers a welcome email with a magic link.
+4. Provide `php artisan tenants:create|list|suspend|activate|terminate|purge`
+   commands wrapping the same Actions.
 
-**Done when.** A new signup creates a working Paymenter instance at
-`{subdomain}.paymenter.io` within 60 seconds, no manual steps.
+**Done when.** A new signup creates a working Paymenter at
+`{subdomain}.paymenter.io` within 60 seconds with no manual steps.
 
 ---
 
@@ -216,58 +221,110 @@ using theme `light` and PayPal gateway — no cross-pollination.
 
 **Goal.** Let a tenant point `billing.acme.com` at us.
 
-1. Central UI: tenant operator adds a custom domain → we generate
-   verification record (TXT or CNAME challenge) → tenant points DNS → we
-   verify → we request a Let's Encrypt cert.
-2. TLS termination at the reverse proxy. Recommended: Caddy with on-demand
-   TLS, gated by an `ask` endpoint that checks against the `domains`
-   table.
-3. Optional CNAME of the apex requires Cloudflare or a similar flattening
-   service. Document this in `DOMAIN_ROUTING.md`, do not implement
-   ourselves.
+1. Central UI: tenant adds a custom domain → we generate a TXT
+   verification record → tenant points DNS → we verify → request a
+   Let's Encrypt cert.
+2. TLS termination via Caddy with on-demand TLS gated by an `ask`
+   endpoint that checks `domains.ssl_status`.
+3. Document the CNAME requirement for tenants.
 
-**Done when.** A tenant operator can add `billing.acme.com`, point a
-CNAME, and within 5 minutes serve their Paymenter on HTTPS at that
-domain with no operator intervention.
+**Done when.** A tenant adds `billing.acme.com`, points a CNAME, and
+within 5 minutes serves their Paymenter on HTTPS with no operator
+intervention.
 
 ---
 
-## Phase 9 — Billing the tenants
+## Phase 9 — Stripe Connect
 
-**Goal.** Charge tenants for the SaaS using Paymenter itself.
+**Goal.** Take a platform fee on every tenant sale.
 
-1. Build `extensions/Servers/PaymenterTenant` — a Paymenter Server
-   extension whose `createServer` calls the same `CreateTenantAction`,
-   whose `suspendServer` flips the tenant `status`, whose `terminateServer`
-   runs the delete command.
-2. Create the central plans (Starter / Pro / Scale) as Paymenter
-   Products on the central app, attached to the new Server extension.
-3. The central app's checkout becomes the signup flow.
+1. Register the Stripe Connect platform (test mode first), set
+   `STRIPE_CONNECT_CLIENT_ID` env.
+2. Build `extensions/Gateways/StripeConnect` Paymenter gateway
+   extension. Differences from the legacy `Stripe` gateway:
+   - OAuth onboarding flow (central-side controller routes).
+   - PaymentIntent created with
+     `transfer_data.destination + on_behalf_of + application_fee_amount`.
+   - Webhook signature verification with the platform secret.
+3. Add the `stripe_platform_ledger` reconciliation job (daily).
+4. Add `platform_fee_bps` / `platform_fee_flat_cents` to
+   `central_plans` and to the `CentralPlanResource` form.
+5. Add operator dashboards: platform revenue by plan, top tenants by
+   fees, refunds-clawed-back chart.
+6. Document Connect setup in `STRIPE_CONNECT.md` (done — link).
 
-**Done when.** A tenant signs up + pays the first invoice → tenant is
-provisioned automatically → late payments suspend the tenant → cancellation
-deletes the tenant after retention window.
+**Done when.** End-to-end test: tenant onboards via OAuth, processes a
+test charge, our platform balance shows the fee, tenant's balance shows
+the rest, refund returns both correctly.
 
 ---
 
-## Phase 10 — Hardening
+## Phase 10 — Curated extension hardening
+
+**Goal.** Replace the open extension loader with the manifest-driven,
+sandboxed loader described in `EXTENSIONS.md`.
+
+1. Define the manifest JSON schema (`schemas/extension.schema.json`).
+2. Update every shipped extension to include a manifest.
+3. Wrap `ExtensionHelper::call` with the capability gates:
+   `ExtensionHttpClient` for egress, `Mail` middleware, `Cache` /
+   `Storage` proxies, `setting()` reads/writes gate, HTML / Markdown /
+   CSS sanitisers on output.
+4. Build `extension_catalogue` migration + `CentralExtensionCatalogueResource`.
+5. Add the `extension_audit_log` migration and writer.
+6. Add the manifest:audit Artisan static-analysis check.
+7. Ship CSP middleware that emits a per-request nonce and the full
+   policy from `EXTENSIONS.md` § 4.4.
+
+**Done when.** A shipped extension refuses to make an HTTP call to a
+non-allow-listed host; a malicious snippet of HTML rendered through an
+extension comes out sanitised; CSP header passes `securityheaders.com`
+with an A+.
+
+---
+
+## Phase 11 — Themes (curated + BYO)
+
+**Goal.** Ship the BYO theme uploader with the Blade sandbox, CSS
+sanitiser, JS allow-list, and preview mode (see `THEMES.md`).
+
+1. `theme_catalogue` migration + central panel resource.
+2. `tenant_themes` migration + tenant panel uploader.
+3. `SandboxBladeCompiler` + view resolver picking it for BYO themes
+   only.
+4. CSS sanitiser, file allow-list, manifest schema validator.
+5. CSP nonce + SRI hash issuance for tenant JS.
+6. Preview signed-URL flow.
+7. Per-tenant compiled view cache directory.
+8. Operator recall flag (auto-revert to `default:curated`).
+
+**Done when.** A tenant uploads a sample BYO theme, the file allow-list
+rejects a `.php` file, the Blade sandbox rejects `@php`, the CSS
+sanitiser strips `expression()`, the preview URL works only for the
+uploading admin, and the catalogue recall flag flips all tenants back
+to the default theme within one request.
+
+---
+
+## Phase 12 — Hardening
 
 **Goal.** Production readiness.
 
 - Per-tenant rate limiting (Laravel rate limiters keyed by tenant id).
-- Audit logs of central actions (`owen-it/laravel-auditing` already in use;
-  extend to `central_users`).
-- Backup strategy: per-tenant DB dumps to S3, rotation.
+- Audit logs of central actions (`owen-it/laravel-auditing` already in
+  use; extend to `central_users` + Stripe-related events).
+- Backup strategy: nightly logical dumps + Postgres PITR.
 - Tenant data export endpoint ("download your data").
-- Tenant deletion grace window (soft-delete tenants for 30 days before
-  dropping the DB).
+- Tenant deletion grace window (soft-delete tenants for 30 days, then
+  RLS-aware purge — `DELETE FROM tenants WHERE id = ?` cascades thanks
+  to the FKs).
 - Monitoring: tenant-scoped metrics in Horizon / Telescope.
 
-**Done when.** All of the above are documented and tested in staging, and
-the runbook in `MIGRATION_GUIDE.md` is signed off.
+**Done when.** Each item documented, tested in staging, runbook signed
+off.
 
 ---
 
 ## Out of scope for v1
 
-See [`ARCHITECTURE.md` § "Decisions deferred"](./ARCHITECTURE.md#decisions-deferred).
+See [`ARCHITECTURE.md` § Decisions deferred](./ARCHITECTURE.md#decisions-deferred).

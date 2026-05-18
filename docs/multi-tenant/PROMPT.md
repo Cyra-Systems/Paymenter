@@ -35,9 +35,11 @@ proposing or writing anything:
   5. docs/multi-tenant/TENANT_ISOLATION.md
   6. docs/multi-tenant/PROVISIONING.md
   7. docs/multi-tenant/DOMAIN_ROUTING.md
-  8. docs/multi-tenant/EXTENSIONS_AND_THEMES.md
-  9. docs/multi-tenant/BILLING_THE_TENANTS.md
- 10. docs/multi-tenant/MIGRATION_GUIDE.md
+  8. docs/multi-tenant/EXTENSIONS.md
+  9. docs/multi-tenant/THEMES.md
+ 10. docs/multi-tenant/STRIPE_CONNECT.md
+ 11. docs/multi-tenant/BILLING_THE_TENANTS.md
+ 12. docs/multi-tenant/MIGRATION_GUIDE.md
 
 Then read these to ground yourself in the codebase you'll be modifying:
 
@@ -84,21 +86,41 @@ For the phase you are executing:
 
 ## Hard rules
 
-- Use stancl/tenancy v4. Do not invent a parallel tenancy mechanism.
+- Use stancl/tenancy v4 in single-database mode. Do not invent a
+  parallel tenancy mechanism. Do not switch to database-per-tenant.
 - Tenant identification is by domain, never by URL path.
-- Database-per-tenant; never add tenant_id columns to existing models.
-- Migrations split: central in database/migrations/, tenant in
-  database/migrations/tenant/.
+- Database is Postgres 16+ with Row-Level Security. Two roles:
+  paymenter_app (NOBYPASSRLS) for tenant traffic, paymenter_admin
+  (BYPASSRLS) for central code only. Two Laravel connections: pg
+  (default) and pg_admin.
+- Every tenant-scoped table has a tenant_id uuid column, a FORCE ROW
+  LEVEL SECURITY policy, and a DEFAULT of
+  current_setting('app.tenant_id', true)::uuid. Use the TenantScoped
+  migration trait. Do not bypass RLS in application code.
+- Stripe Connect (Standard accounts) is the only sanctioned payment
+  path for tenant→customer charges. application_fee_amount is mandatory
+  and configured per central_plans row. The legacy plain Stripe gateway
+  is deprecated.
+- Extensions are operator-curated. Every extension ships an
+  extension.json manifest declaring capabilities. Undeclared
+  capabilities are denied at runtime. HTML/CSS/Markdown output from
+  extensions goes through hardened sanitisers; CSP is emitted per
+  response.
+- Themes are curated by default. BYO themes are gated to Pro+ plans
+  and run through a sandboxed Blade compiler (no @php, no {!! !!},
+  file allow-list, CSS sanitiser, JS allow-list with SRI). Never
+  weaken the sandbox.
 - Stay rebase-compatible with upstream paymenter/paymenter: prefer
   additive providers/middleware/config over rewrites; if a core file
   must change, the diff must be minimal and noted in
   ARCHITECTURE.md or MIGRATION_GUIDE.md.
-- Never commit secrets, .env files, oauth keys, or tenant DB
-  passwords.
-- Never weaken auth, encryption, or signed URLs to get a phase to pass.
-- Do not run destructive operations (DROP DATABASE, rm -rf
-  storage/app/tenant*, php artisan migrate:fresh on prod-like state)
-  without asking the human first.
+- Never commit secrets, .env files, OAuth keys, Stripe keys, or
+  per-tenant config.
+- Never weaken auth, encryption, signed URLs, RLS policies, or
+  sanitisers to get a phase to pass.
+- Do not run destructive operations (DELETE FROM tenants, rm -rf
+  storage/app/tenant*, php artisan migrate:fresh on prod-like state,
+  Stripe production charges) without asking the human first.
 
 ## Style
 

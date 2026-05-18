@@ -177,6 +177,10 @@ These are all affected by the host:
 - **OAuth callback URLs** (Discord, GitHub via socialite, Passport
   redirects) are built from `url()` — they pick up the request host, so
   no change.
+- **Stripe Connect OAuth callback** is the special case: it hits the
+  central host, not the tenant. The `state` parameter must carry the
+  tenant id (encrypted, short TTL) so the callback can re-bootstrap
+  context. See [`STRIPE_CONNECT.md`](./STRIPE_CONNECT.md) § 2.1.
 - **Signed URLs** (`AppServiceProvider::register`'s
   `alternateHasCorrectSignature` macro at
   `app/Providers/AppServiceProvider.php:46`) sign against the request
@@ -226,3 +230,6 @@ codebase if you want, on its own routes file.
 - **HSTS** — only on `central.paymenter.io` for v1. Adding it on tenant
   domains commits us to TLS for the customer's domain forever; let the
   tenant turn it on.
+- **CSP headers** are emitted per-response (see `EXTENSIONS.md` § 4.4
+  for the policy). The same middleware applies on both tenant and
+  central domains; nonces are per-request.

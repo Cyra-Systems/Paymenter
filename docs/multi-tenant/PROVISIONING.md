@@ -1,9 +1,15 @@
 # Provisioning
 
-How a new tenant goes from a credit-card submit to a working Paymenter
+How a tenant goes from a credit-card submit to a working Paymenter
 instance, and how an existing tenant is suspended or torn down.
 
-## 1. Tenant signup flow
+> Implementation note: because we use **single-database Postgres with
+> RLS** (not database-per-tenant), provisioning is much faster than the
+> classic "spin up a DB" SaaS model — usually under 5 seconds.
+
+---
+
+## 1. Signup flow
 
 ```
 ┌─────────────────────────────┐
@@ -30,18 +36,21 @@ instance, and how an existing tenant is suspended or torn down.
 │ CreateTenantAction          │
 │  1. INSERT tenants          │
 │  2. INSERT domains          │
-│  3. CREATE DATABASE         │
-│  4. php artisan tenants:    │
-│     migrate {id}            │
-│  5. seed defaults           │
-│  6. passport:keys           │
-│  7. send welcome email      │
+│  3. SET app.tenant_id …     │  (RLS context)
+│  4. seed tenant defaults    │
+│  5. passport:keys (on disk) │
+│  6. send welcome email      │
 └─────────────────────────────┘
 ```
 
-## 2. Inputs
+No `CREATE DATABASE`, no `migrate` per tenant — the schema and policies
+already exist. We just create the tenant row, set the RLS context, and
+INSERT the seed rows; Postgres fills `tenant_id` automatically via the
+column default.
 
-The signup form collects:
+---
+
+## 2. Inputs
 
 | Field | Validation | Example |
 | ----- | ---------- | ------- |
@@ -54,8 +63,10 @@ The signup form collects:
 | currency | required, ISO 4217 | `EUR` |
 
 The `subdomain` becomes `${subdomain}.paymenter.io`. We refuse reserved
-names (`www`, `central`, `admin`, `api`, `mail`, `status`, plus a
-configurable list in `config/tenancy.php`).
+names (`www`, `central`, `admin`, `api`, `mail`, `status`, …) from a
+configurable list in `config/tenancy.php`.
+
+---
 
 ## 3. `CreateTenantAction` (canonical reference implementation)
 
@@ -64,14 +75,15 @@ namespace App\Central\Actions;
 
 use App\Models\Tenant;
 use App\Models\Domain;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\{Artisan, DB};
 use Illuminate\Support\Str;
 
 class CreateTenantAction
 {
     public function __invoke(array $input): Tenant
     {
-        return \DB::transaction(function () use ($input) {
+        // Central DB transaction — RLS-bypassed via the pg_admin connection.
+        return DB::connection('pg_admin')->transaction(function () use ($input) {
             $tenant = Tenant::create([
                 'id'   => (string) Str::uuid(),
                 'data' => [
@@ -89,13 +101,16 @@ class CreateTenantAction
                 'primary'   => true,
             ]);
 
-            // stancl/tenancy: creates the DB and runs migrations
-            $tenant->runForCurrent();
-            Artisan::call('tenants:migrate', ['--tenants' => [$tenant->id]]);
-            Artisan::call('tenants:seed',    ['--tenants' => [$tenant->id], '--class' => 'TenantDefaultsSeeder']);
-
+            // Switch into the tenant's RLS context for seeding.
             $tenant->run(function () use ($input) {
+                // Passport keys go onto the tenant-prefixed local disk.
                 Artisan::call('passport:keys', ['--force' => true]);
+
+                \App\Models\Role::create([
+                    'name' => 'Owner',
+                    'permissions' => ['*'],
+                ]);
+
                 \App\Models\User::create([
                     'first_name' => $input['admin_first_name'],
                     'last_name'  => $input['admin_last_name'],
@@ -103,11 +118,17 @@ class CreateTenantAction
                     'password'   => bcrypt(Str::random(40)),  // overwritten by setup link
                     'role_id'    => 1,
                 ]);
-                setting(['mail_from_address' => $input['admin_email']])->save();
-                setting(['app_name' => $input['company_name']])->save();
+
+                \App\Models\Currency::firstOrCreate([
+                    'code' => $input['currency'],
+                ], ['name' => $input['currency']]);
+
+                setting(['app_name'           => $input['company_name']])->save();
+                setting(['mail_from_address'  => $input['admin_email']])->save();
+                setting(['theme.active'       => 'default:curated'])->save();
             });
 
-            $tenant->update(['data' => array_merge($tenant->data, ['status' => 'active'])]);
+            $tenant->update(['data->status' => 'active']);
 
             \App\Central\Mail\TenantWelcome::send($tenant);
             return $tenant;
@@ -116,33 +137,43 @@ class CreateTenantAction
 }
 ```
 
-> The transaction is in the **central** DB only. `CREATE DATABASE` is not
-> transactional; if step 3 succeeds and step 6 fails, the central row is
-> rolled back but the tenant DB is left behind. The compensating action
-> (drop DB) is in the catch path of the queue job that wraps this action.
+Why this works without a `migrate` step: the `users`, `roles`,
+`currencies`, `settings` (etc.) tables already exist, are RLS-guarded,
+and have a `tenant_id` DEFAULT of `current_setting('app.tenant_id', true)::uuid`.
+Inside `$tenant->run(...)`, the RLS bootstrapper has executed `SET LOCAL
+app.tenant_id = '<uuid>'`, so every INSERT picks up the right tenant
+id automatically.
+
+---
 
 ## 4. Async vs. sync
 
 The action runs inside a queued job (`CreateTenantJob`) on the central
-queue, so the signup form returns immediately with a "we're provisioning"
-page that polls. Provisioning in production takes 10–30s on a healthy DB
-server.
+queue. Signup returns a "we're provisioning" page that polls. End-to-end
+in production: about 3-8 seconds (no per-tenant DB creation; mostly the
+seed inserts and the welcome email).
 
-## 5. The `TenantDefaultsSeeder`
+---
 
-Lives at `database/seeders/TenantDefaultsSeeder.php`. Seeds:
+## 5. Tenant defaults
 
-- A default `Role` named `Owner` with all permissions.
-- A default `Currency` (the one chosen in signup).
-- A default empty `Setting` set (app_name, etc).
-- A default email template set.
-- **Does not** seed sample products, demo orders, or test data — tenants
-  see a clean slate.
+Seeded inline (above). For richer defaults — sample products, email
+templates, etc. — call `database/seeders/TenantDefaultsSeeder` inside
+the same `$tenant->run(...)` block. It must **not** require any prior
+tenant data and must not assume any environment variable.
+
+Explicitly **not** seeded for production tenants:
+
+- Demo products, fake orders, fake users.
+- Any extension enablement (tenant picks from the catalogue).
+- Any payment gateway config (tenant fills credentials).
+
+---
 
 ## 6. Welcome email + magic link
 
-`App\Central\Mail\TenantWelcome` sends an email from the **central** SMTP
-to the admin. It contains a signed URL good for 24 hours:
+`App\Central\Mail\TenantWelcome` sends from the **central** SMTP to the
+admin. Contains a signed URL good for 24 hours:
 
 ```
 https://{subdomain}.paymenter.io/setup?token={hmac}
@@ -151,51 +182,68 @@ https://{subdomain}.paymenter.io/setup?token={hmac}
 The setup page (Livewire) sets the password and 2FA, then redirects to
 `/admin`.
 
+---
+
 ## 7. Suspension
 
 Triggered by:
 
-- An overdue central invoice (after grace period).
+- An overdue central invoice past grace.
 - Manual operator action in the central panel.
-- A terms-of-service violation flag.
+- A T&C violation flag.
+- Stripe Connect account being deauthorised AND the plan requires
+  Stripe Connect for SaaS subscription (rare edge case).
 
-Mechanics: flip `tenant->data['status'] = 'suspended'`. The tenant
-middleware checks this on every request and returns the suspended page
-template (HTTP 402 or 503 depending on cause).
+Mechanics: flip `tenants.data->status` to `suspended`. The
+`EnforceTenantStatus` middleware checks this on every request and
+returns the appropriate response.
 
 ```php
-// app/Http/Middleware/EnforceTenantStatus.php
-public function handle(Request $request, Closure $next): Response
+class EnforceTenantStatus
 {
-    $status = tenant()->data['status'] ?? 'active';
+    public function handle(Request $request, Closure $next): Response
+    {
+        $status = tenant()->data['status'] ?? 'active';
 
-    return match ($status) {
-        'active'         => $next($request),
-        'suspended'      => response()->view('central.suspended', [], 402),
-        'terminating'    => response()->view('central.terminating', [], 503),
-        default          => abort(404),
-    };
+        return match ($status) {
+            'active'      => $next($request),
+            'suspended'   => response()->view('central.suspended', [], 402),
+            'terminating' => response()->view('central.terminating', [], 503),
+            default       => abort(404),
+        };
+    }
 }
 ```
 
+Suspension does **not** delete data; it just blocks request handling
+and pauses Stripe charges (we cancel any pending subscription renewals
+to prevent surprise charges).
+
+---
+
 ## 8. Termination
 
-Two-step, with a grace window:
+Two-step with a grace window:
 
 1. **Mark for termination** — `status = 'terminating'`, set
    `terminate_at = now()->addDays(30)`. Tenant cannot log in. Operator
-   can still re-activate from central panel.
-2. **Drop** — a daily scheduler runs `php artisan tenants:purge` which:
-   - Snapshots a final DB dump to `s3://paymenter-archive/{tenant}/`.
-   - `DROP DATABASE tenant_{uuid}`.
-   - Removes `storage/app/tenant{id}/`.
-   - Deletes the `domains` rows.
-   - Deletes the `tenants` row.
-   - Logs to `central_audit`.
+   can re-activate from the central panel.
+2. **Purge** — daily scheduler runs `php artisan tenants:purge`:
+   - Dump the tenant's rows from every tenant table to
+     `s3://paymenter-archive/{tenant_uuid}/final-{date}.sql.gz` (use
+     `pg_dump --table` per table with a `WHERE tenant_id = '...'`
+     filter, or a single `COPY (SELECT ...) TO STDOUT`).
+   - `DELETE FROM tenants WHERE id = ?` — cascades through every FK
+     thanks to `ON DELETE CASCADE` on the `tenant_id` columns,
+     removing all tenant data atomically in a single transaction.
+   - Remove `storage/app/tenant/{id}/`.
+   - Remove `domains` rows (TLS certs auto-expire).
+   - Log to `central_audit`.
 
-This is **destructive** and **irreversible**; we always require a
-re-confirmation from a central operator before the purge runs, unless the
-tenant explicitly opted into auto-purge on signup.
+Because the data is in a single Postgres database, the `DELETE` is
+atomic and quick — no partial-cleanup state.
+
+---
 
 ## 9. Operational commands
 
@@ -206,35 +254,66 @@ php artisan tenants:create --subdomain=acme --email=ops@acme.test --plan=pro
 # list
 php artisan tenants:list
 
-# inspect
+# inspect (run code in tenant context)
 php artisan tinker
 > Tenant::find('uuid')->run(fn () => User::count())
 
-# migrate all tenants (after upstream rebase adds a migration)
-php artisan tenants:migrate
-
 # seed one tenant
-php artisan tenants:seed --tenants=uuid --class=NewSeeder
+php artisan tenants:seed --tenants=uuid --class=NewTenantSeeder
 
 # suspend / activate
 php artisan tenants:suspend uuid
 php artisan tenants:activate uuid
 
-# delete (grace + dump)
+# terminate (grace window starts)
 php artisan tenants:terminate uuid
+
+# purge (after grace, destroys data; archives first)
+php artisan tenants:purge uuid
 ```
 
-The Artisan commands are thin wrappers around the same `App\Central\Actions`
-that the central panel and the signup flow call. One code path, three
-entry points.
+All Artisan commands are thin wrappers around `App\Central\Actions`.
+The signup flow, the central Filament panel, and the Server extension
+all call the same Actions.
 
-## 10. Test data
+---
 
-For local dev, `database/seeders/CentralDevSeeder.php` creates:
+## 10. Test data for local dev
+
+`database/seeders/CentralDevSeeder.php`:
 
 - A central operator (`admin@central.test` / `password`).
 - Three plans (free, pro, scale).
-- Two tenants (`alpha.paymenter.test`, `beta.paymenter.test`) seeded with
-  Paymenter defaults plus a couple of demo products.
+- Two tenants seeded with Paymenter defaults plus a couple of demo
+  products each: `alpha.paymenter.test`, `beta.paymenter.test`.
 
-Run with `php artisan migrate:fresh --seed --seeder=CentralDevSeeder`.
+```bash
+php artisan migrate:fresh --seed --seeder=CentralDevSeeder
+```
+
+`/etc/hosts` (or dnsmasq) maps `*.paymenter.test` to 127.0.0.1.
+
+---
+
+## 11. Provisioning failure modes
+
+| Failure | Handling |
+| ------- | -------- |
+| Subdomain race (two signups for same subdomain in flight) | DB unique constraint on `domains.domain` rejects the second; Action surfaces a friendly error. |
+| Welcome email transport failure | Provisioning still succeeds; an admin-only operator alert fires; tenant can resend from the central panel. |
+| Seed failure (e.g. role insert blew up) | `DB::connection('pg_admin')->transaction()` rolls back the central rows; tenant row never exists. |
+| First invoice never paid | `tenants` row stays at `status = 'pending'`; nothing is provisioned (the Server extension's `createServer` never fires); a cleanup job removes stale pending tenants after 7 days. |
+| Stripe webhook arrives before `createServer` finishes | The webhook handler waits for the tenant row to exist, with a short backoff. After 60s it dead-letters. |
+
+---
+
+## 12. Re-provisioning
+
+If a tenant resurrects a terminated subdomain within the 30-day grace
+window, `tenants:activate` flips the status back. After purge, the
+subdomain is reusable; the new signup is independent (new UUID, new
+data).
+
+For a tenant who wants to migrate to a different subdomain, we add a
+new `domains` row (primary = true) and demote the old one. No data
+migration needed.
