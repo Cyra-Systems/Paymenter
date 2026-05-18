@@ -1,91 +1,51 @@
-<br>
-<p align="center">
-  <a href="https://paymenter.org">
-    <picture>
-      <source media="(max-width: 768px)" srcset="https://paymenter.org/iso.svg" width="65px">
-      <source media="(prefers-color-scheme: dark)" srcset="https://paymenter.org/iso.svg" width="80px">
-      <source media="(prefers-color-scheme: light)" srcset="https://paymenter.org/iso.svg" width="80px">
-      <img alt="Paymenter Isotype" src="https://paymenter.org/iso.svg">
-    </picture>
-  </a>
-</p>
-<h1 align="center">
-  Paymenter
-</h1>
+# Billing
 
-<div align="center">
-  <h3>Open-Source Billing, Built for Hosting</h3>
-  <p>Automate subscriptions, eliminate billing chaos, and grow your hosting business – without vendor lock-ins or hidden costs.</p>
-</div>
+A billing platform for hosting companies, packaged as a multi-tenant SaaS.
 
-<h4 align="center">
-  <a href="https://paymenter.org">Website</a> ·
-  <a href="https://paymenter.org/docs/installation/install">Documentation</a> ·
-  <a href="https://demo.paymenter.org">Live Demo</a> ·
-  <a href="https://paymenter.org/marketplace">Extensions</a>
-</h4>
+This repository is a fork of the upstream [Paymenter](https://github.com/Paymenter/paymenter)
+open-source billing platform, evolved into a multi-tenant Software-as-a-Service:
+one codebase, one Postgres database (isolated by Row-Level Security), many
+hosting-company customers, automatic platform fees through Stripe Connect.
 
- <div align="center">
-   
-  [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Paymenter/paymenter/blob/master/LICENSE)
-  [![Downloads](https://img.shields.io/github/downloads/paymenter/paymenter/total)]()
-  [![GitHub release (latest by date)](https://img.shields.io/github/v/release/paymenter/paymenter)](https://github.com/Paymenter/paymenter/releases)
-    <br>
-    <br>
-  [![Discord](https://img.shields.io/discord/882318291014651924?logo=discord&labelColor=white&color=5865f2)](https://discord.gg/paymenter-882318291014651924)
-  
-</div>
+The original Paymenter copyright is preserved in `LICENSE` as required by the
+MIT license. The multi-tenant conversion, central operator app, theme
+sandbox, Stripe Connect integration, and hardened extension catalogue are
+the contributions of this fork.
 
-<div align="center">
-    <picture>
-      <source media="(max-width: 768px)" srcset="https://upload.wikimedia.org/wikipedia/commons/c/ca/1x1.png">
-      <source media="(prefers-color-scheme: dark)" srcset="https://paymenter.org/landing/screenshots/dark/dashboard.webp">
-      <source media="(prefers-color-scheme: light)" srcset="https://paymenter.org/landing/screenshots/light/dashboard.webp">
-      <img alt="Paymenter Dashboard" src="https://paymenter.org/landing/screenshots/dark/dashboard.webp">
-    </picture>
-    <br>
-</div>
+## Stack
 
-## Getting Started
+- PHP 8.3+, Laravel 12
+- Filament v5 — admin panels (tenant + central operator)
+- Livewire v4 — client UI
+- Postgres 16+ with Row-Level Security
+- Stripe Connect — tenant payments + platform fee
 
+## Documentation
 
-#### Installation & Documentation
+The multi-tenant conversion is documented end-to-end in
+[`docs/multi-tenant/`](docs/multi-tenant/README.md):
 
-For a detailed explanation of how to install and configure Paymenter, take a look at our [documentation here](https://paymenter.org/docs/getting-started/introduction/).
+| Topic | File |
+| ----- | ---- |
+| Architecture decisions | [`docs/multi-tenant/ARCHITECTURE.md`](docs/multi-tenant/ARCHITECTURE.md) |
+| Phased implementation plan | [`docs/multi-tenant/IMPLEMENTATION_PLAN.md`](docs/multi-tenant/IMPLEMENTATION_PLAN.md) |
+| Postgres RLS + isolation | [`docs/multi-tenant/TENANT_ISOLATION.md`](docs/multi-tenant/TENANT_ISOLATION.md) |
+| Tenant signup & provisioning | [`docs/multi-tenant/PROVISIONING.md`](docs/multi-tenant/PROVISIONING.md) |
+| Subdomain + custom domain routing | [`docs/multi-tenant/DOMAIN_ROUTING.md`](docs/multi-tenant/DOMAIN_ROUTING.md) |
+| Curated extensions + HTML/CSS hardening | [`docs/multi-tenant/EXTENSIONS.md`](docs/multi-tenant/EXTENSIONS.md) |
+| Theme system (curated + BYO sandbox) | [`docs/multi-tenant/THEMES.md`](docs/multi-tenant/THEMES.md) |
+| Stripe Connect platform fee | [`docs/multi-tenant/STRIPE_CONNECT.md`](docs/multi-tenant/STRIPE_CONNECT.md) |
+| Billing the tenants | [`docs/multi-tenant/BILLING_THE_TENANTS.md`](docs/multi-tenant/BILLING_THE_TENANTS.md) |
+| Migrating a live single-tenant instance | [`docs/multi-tenant/MIGRATION_GUIDE.md`](docs/multi-tenant/MIGRATION_GUIDE.md) |
 
-Or, get additional help via [Community Discord](https://discord.gg/xB4UUT3XQg).
+## Requirements
 
-#### Requirements
-
-The requirements for Paymenter are the following:
-
-- PHP (8.3 or higher).
+- PHP 8.3 or 8.4
 - Composer
-- Webserver (Apache or Nginx)
-- Database (MariaDB)
-
-## What is Paymenter?
-
-Paymenter is an open-source billing platform tailored for hosting companies. It simplifies the management of hosting services, providing a seamless experience for both providers and customers. Built on modern web technologies, Paymenter offers a flexible and robust solution for your hosting business needs.
-
-### Key Features:
-- User-Friendly Interface: Paymenter is designed with simplicity in mind, ensuring an intuitive experience for users of all technical levels.
-- Open Source and Extensible: As an open-source platform, Paymenter encourages community contributions and customization. Its architecture allows for extensive modifications and integration with other tools.
-- Efficient Management: Streamline your operations with Paymenter powerful admin panel, designed to enhance productivity and reduce overhead.
-- Secure and Reliable: Built with security as a priority, Paymenter ensures the protection of your data and transactions.
-- Community Driven: Join an engaged community of developers and hosting providers to collaborate and drive the future development of Paymenter.
-
-Paymenter is available under the MIT license, offering you the freedom to adapt and evolve the platform to meet your specific requirements.
-
-## Sponsors
-
-Thanks to all sponsors for helping fund Paymenter's development. [Interested in becoming a sponsor?](https://github.com/sponsors/Paymenter)
-
-
-<a href="https://www.kuroit.com/?rel=paymenter">
-  <img src="https://github.com/user-attachments/assets/8d00b4bb-a66c-449f-94e4-cbb9ea1c0d11" width="400">
-</a>
+- A reverse proxy (Caddy recommended, for on-demand TLS on custom domains)
+- Postgres 16+
+- Redis (cache + queue)
 
 ## License
 
-Licensed under the [MIT License](https://github.com/Paymenter/Paymenter/blob/master/LICENSE).
+MIT — see [`LICENSE`](LICENSE).

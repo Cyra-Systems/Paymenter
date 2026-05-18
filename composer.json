@@ -1,10 +1,13 @@
 {
     "name": "paymenter/paymenter",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Multi-tenant billing platform for hosting companies.",
     "keywords": [
-        "laravel",
-        "framework"
+        "billing",
+        "saas",
+        "multi-tenant",
+        "hosting",
+        "laravel"
     ],
     "license": "MIT",
     "version": "dev-master",

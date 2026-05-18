@@ -1,7 +1,6 @@
 x-common:
   database: &db-environment
-    # Do not remove the "&db-password" from the end of the line below, it is important
-    # for Paymenter functionality.
+    # Do not remove the "&db-password" from the end of the line below.
     MYSQL_PASSWORD: &db-password "CHANGE_ME"
     MYSQL_ROOT_PASSWORD: "CHANGE_ME_TOO"
 
@@ -21,16 +20,17 @@ services:
       - "./database:/var/lib/mysql"
     environment:
       <<: *db-environment
-      MYSQL_DATABASE: "paymenter"
-      MYSQL_USER: "paymenter"
+      MYSQL_DATABASE: "billing"
+      MYSQL_USER: "billing"
     networks:
-      - paymenter_nw
+      - app_nw
   cache:
     image: redis:alpine
     restart: always
     networks:
-      - paymenter_nw
-  paymenter:
+      - app_nw
+  app:
+    # Replace with your own published image once you publish one.
     image: ghcr.io/paymenter/paymenter:master
     restart: always
     ports:
@@ -54,7 +54,7 @@ services:
       # By default, default themes and extensions are always renewed on startup
       PAYMENTER_SKIP_DEFAULT: "false"
     networks:
-      - paymenter_nw
+      - app_nw
   # Asset Builder Service - used to build frontend assets (themes/extensions)
   asset-builder:
     image: node:22-alpine
@@ -71,9 +71,9 @@ services:
       echo 'Usage: docker compose run --rm asset-builder npm install && npm run build' &&
       tail -f /dev/null"
     networks:
-      - paymenter_nw
+      - app_nw
 networks:
-  paymenter_nw:
+  app_nw:
     driver: bridge
 
 volumes:
