@@ -8,11 +8,11 @@ use App\Models\Currency;
 
 class LocaleSwitch extends Component
 {
-    public $currentLocale;
+    public string $currentLocale;
 
-    public $currentCurrency;
+    public string $currentCurrency;
 
-    protected $currencies = [];
+    protected array $currencies = [];
 
     public function mount()
     {
@@ -65,7 +65,7 @@ class LocaleSwitch extends Component
 
     public function render()
     {
-        $locales = config('settings.allowed_languages');
+        $locales = config('settings.allowed_languages', []);
 
         return view('components.locale-switch', compact('locales'));
     }
